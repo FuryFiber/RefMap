@@ -8,33 +8,112 @@ use crate::core::pdfparser::Metadata;
 
 
 pub struct MindMapApp {
-    map: MindMap,
-    dragging_node: Option<Uuid>,
-    connecting_from: Option<Uuid>,
-    selected_nodes: Vec<Uuid>,
-    selected_edges: Vec<Uuid>,
-    marquee_start: Option<egui::Pos2>,
-    marquee_rect: Option<egui::Rect>,
-    pan: egui::Vec2,
-    zoom: f32,
-    current_file: Option<String>,
-    last_save: std::time::Instant,
-    dirty: bool,
-    rightclick_node: Option<Uuid>,
-    show_context_menu: bool,
-    context_menu_pos: egui::Pos2,
-    show_edit_dialog: bool,
-    edit_node_id: Option<Uuid>,
-    edit_metadata: EditableMetadata,
+    map: MindMap,                       // the mind map data
+
+    // Interaction state
+    dragging_node: Option<Uuid>,        // currently dragged node
+    connecting_from: Option<Uuid>,      // node from which a connection is being made
+    selected_nodes: Vec<Uuid>,          // currently selected nodes
+    selected_edges: Vec<Uuid>,          // currently selected edges
+
+    // For marquee selection
+    marquee_start: Option<egui::Pos2>,  // where the marquee drag started
+    marquee_rect: Option<egui::Rect>,   // current marquee rectangle
+
+    // View state
+    pan: egui::Vec2,                    // panning offset
+    zoom: f32,                          // zoom level
+
+    // File state
+    current_file: Option<String>,       // currently opened file path
+    last_save: std::time::Instant,      // last save time for autosave
+    dirty: bool,                        // whether there are unsaved changes
+
+    // Right-click context menu state
+    rightclick_node: Option<Uuid>,      // node that was right-clicked
+    show_context_menu: bool,            // whether context menu should be visible
+    context_menu_pos: egui::Pos2,       // position to show context menu
+
+    // Metadata editing state
+    show_edit_dialog: bool,             // whether to show metadata edit dialog
+    edit_node_id: Option<Uuid>,         // node currently being edited
+    edit_metadata: EditableMetadata,    // editable metadata fields
+
+    // Annotation state
+    show_annotations_panel: bool,
+    show_add_annotation_dialog: bool,
+    show_edit_annotation_dialog: bool,
+    edit_annotation_id: Option<Uuid>,
+    edit_annotation: EditableAnnotation,
+    annotations_node_id: Option<Uuid>,
 }
 
 // Helper struct for editing metadata
 #[derive(Debug, Clone, Default)]
 struct EditableMetadata {
     title: String,
-    authors: String, // comma-separated
-    keywords: String, // comma-separated
+    authors: String,
+    keywords: String,
     date: String,
+}
+
+// Annotation types
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[derive(PartialEq)]
+pub enum AnnotationType {
+    #[default]
+    TextNote,
+    Question,
+    Summary,
+    Quote,
+    Todo,
+    Idea,
+    Warning,
+}
+
+impl AnnotationType {
+    fn name(&self) -> &'static str {
+        match self {
+            AnnotationType::TextNote => "Text Note",
+            AnnotationType::Question => "Question",
+            AnnotationType::Summary => "Summary",
+            AnnotationType::Quote => "Quote",
+            AnnotationType::Todo => "Todo",
+            AnnotationType::Idea => "Idea",
+            AnnotationType::Warning => "Warning",
+        }
+    }
+
+    fn color(&self) -> egui::Color32 {
+        match self {
+            AnnotationType::TextNote => egui::Color32::LIGHT_GRAY,
+            AnnotationType::Question => egui::Color32::LIGHT_BLUE,
+            AnnotationType::Summary => egui::Color32::LIGHT_GREEN,
+            AnnotationType::Quote => egui::Color32::YELLOW,
+            AnnotationType::Todo => egui::Color32::LIGHT_RED,
+            AnnotationType::Idea => egui::Color32::from_rgb(255, 200, 100),
+            AnnotationType::Warning => egui::Color32::from_rgb(255, 100, 100),
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Annotation {
+    pub id: Uuid,
+    pub annotation_type: AnnotationType,
+    pub title: String,
+    pub content: String,
+    pub created_at: String,
+    pub page_number: Option<u32>, // For PDF annotations
+}
+
+// Add new struct for annotation editing
+#[derive(Debug, Clone, Default)]
+struct EditableAnnotation {
+    title: String,
+    content: String,
+    annotation_type: AnnotationType,
+    page_number: String,
 }
 
 impl MindMapApp {
@@ -74,9 +153,10 @@ impl MindMapApp {
             });
         });
     }
+
     fn show_context_menu(&mut self, ctx: &egui::Context) {
         if self.show_context_menu {
-            let menu_rect = egui::Rect::from_min_size(self.context_menu_pos, egui::vec2(120.0, 60.0));
+            let menu_rect = egui::Rect::from_min_size(self.context_menu_pos, egui::vec2(150.0, 100.0));
 
             egui::Area::new(Id::from("context_menu"))
                 .fixed_pos(self.context_menu_pos)
@@ -84,14 +164,33 @@ impl MindMapApp {
                 .show(ctx, |ui| {
                     egui::Frame::popup(ui.style())
                         .show(ui, |ui| {
-                            ui.set_min_width(120.0);
+                            ui.set_min_width(150.0);
 
-                            if ui.button("Edit").clicked() {
+                            if ui.button("Edit Metadata").clicked() {
                                 self.start_editing();
                                 self.show_context_menu = false;
                             }
 
-                            if ui.button("Delete").clicked() {
+                            if ui.button("View Annotations").clicked() {
+                                if let Some(node_id) = self.rightclick_node {
+                                    self.annotations_node_id = Some(node_id);
+                                    self.show_annotations_panel = true;
+                                }
+                                self.show_context_menu = false;
+                            }
+
+                            if ui.button("Add Annotation").clicked() {
+                                if let Some(node_id) = self.rightclick_node {
+                                    self.annotations_node_id = Some(node_id);
+                                    self.edit_annotation = EditableAnnotation::default();
+                                    self.show_add_annotation_dialog = true;
+                                }
+                                self.show_context_menu = false;
+                            }
+
+                            ui.separator();
+
+                            if ui.button("Delete Node").clicked() {
                                 if let Some(node_id) = self.rightclick_node {
                                     self.map.remove_node(node_id);
                                     self.dirty = true;
@@ -108,6 +207,220 @@ impl MindMapApp {
                         self.show_context_menu = false;
                     }
                 }
+            }
+        }
+    }
+
+    // Show annotations panel
+    fn show_annotations_panel(&mut self, ctx: &egui::Context) {
+        if self.show_annotations_panel {
+            if let Some(node_id) = self.annotations_node_id {
+                egui::Window::new("Annotations")
+                    .collapsible(false)
+                    .resizable(true)
+                    .default_width(400.0)
+                    .default_height(600.0)
+                    .show(ctx, |ui| {
+                        // Find the node and clone the data we need
+                        let node_data = self.map.nodes.iter()
+                            .find(|n| n.id == node_id)
+                            .map(|n| (n.title.clone(), n.annotations.clone()));
+
+                        if let Some((node_title, annotations)) = node_data {
+                            ui.heading(format!("Annotations for: {}", node_title));
+                            ui.separator();
+
+                            // Add new annotation button
+                            if ui.button("➕ Add New Annotation").clicked() {
+                                self.edit_annotation = EditableAnnotation::default();
+                                self.show_add_annotation_dialog = true;
+                            }
+
+                            ui.separator();
+
+                            // Show existing annotations
+                            egui::ScrollArea::vertical().show(ui, |ui| {
+                                for annotation in &annotations {
+                                    self.show_annotation_card(ui, annotation, node_id);
+                                    ui.separator();
+                                }
+
+                                if annotations.is_empty() {
+                                    ui.label("No annotations yet. Click 'Add New Annotation' to get started!");
+                                }
+                            });
+
+                            ui.horizontal(|ui| {
+                                if ui.button("Close").clicked() {
+                                    self.show_annotations_panel = false;
+                                    self.annotations_node_id = None;
+                                }
+                            });
+                        } else {
+                            ui.label("Node not found");
+                        }
+                    });
+            }
+        }
+    }
+
+    // Show individual annotation card
+    fn show_annotation_card(&mut self, ui: &mut egui::Ui, annotation: &Annotation, node_id: Uuid) {
+        let frame = egui::Frame::new()
+            .inner_margin(egui::Margin::same(8))
+            .corner_radius(4.0)
+            .stroke(egui::Stroke::new(1.0, annotation.annotation_type.color()));
+
+        frame.show(ui, |ui| {
+            ui.horizontal(|ui| {
+                if !annotation.title.is_empty() {
+                    ui.label(egui::RichText::new(&annotation.title).strong().color(egui::Color32::WHITE));
+                }
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.small_button("🗑").on_hover_text("Delete").clicked() {
+                        // Remove annotation
+                        if let Some(node) = self.map.nodes.iter_mut().find(|n| n.id == node_id) {
+                            node.annotations.retain(|a| a.id != annotation.id);
+                            self.dirty = true;
+                        }
+                    }
+
+                    if ui.small_button("✏").on_hover_text("Edit").clicked() {
+                        self.start_editing_annotation(annotation.clone());
+                    }
+
+                    if let Some(page) = annotation.page_number {
+                        ui.label(format!("p.{}", page));
+                    }
+                });
+            });
+
+            if !annotation.content.is_empty() {
+                ui.label(&annotation.content);
+            }
+
+            ui.label(egui::RichText::new(&annotation.created_at).small().color(egui::Color32::DARK_GRAY));
+        });
+    }
+
+    // Show add/edit annotation dialog
+    fn show_annotation_dialog(&mut self, ctx: &egui::Context) {
+        let is_editing = self.show_edit_annotation_dialog;
+        let show_dialog = self.show_add_annotation_dialog || is_editing;
+
+        if show_dialog {
+            let title = if is_editing { "Edit Annotation" } else { "Add New Annotation" };
+
+            egui::Window::new(title)
+                .collapsible(false)
+                .resizable(true)
+                .default_width(400.0)
+                .show(ctx, |ui| {
+                    ui.label("Create a new annotation for this node:");
+                    ui.separator();
+
+                    egui::Grid::new("annotation_grid")
+                        .num_columns(2)
+                        .spacing([40.0, 4.0])
+                        .show(ui, |ui| {
+                            ui.label("Type:");
+                            egui::ComboBox::from_label("")
+                                .selected_text(self.edit_annotation.annotation_type.name())
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(&mut self.edit_annotation.annotation_type, AnnotationType::TextNote, "Text Note");
+                                    ui.selectable_value(&mut self.edit_annotation.annotation_type, AnnotationType::Question, "Question");
+                                    ui.selectable_value(&mut self.edit_annotation.annotation_type, AnnotationType::Summary, "Summary");
+                                    ui.selectable_value(&mut self.edit_annotation.annotation_type, AnnotationType::Quote, "Quote");
+                                    ui.selectable_value(&mut self.edit_annotation.annotation_type, AnnotationType::Todo, "Todo");
+                                    ui.selectable_value(&mut self.edit_annotation.annotation_type, AnnotationType::Idea, "Idea");
+                                    ui.selectable_value(&mut self.edit_annotation.annotation_type, AnnotationType::Warning, "Warning");
+                                });
+                            ui.end_row();
+
+                            ui.label("Title:");
+                            ui.text_edit_singleline(&mut self.edit_annotation.title);
+                            ui.end_row();
+
+                            ui.label("Page (optional):");
+                            ui.text_edit_singleline(&mut self.edit_annotation.page_number);
+                            ui.end_row();
+
+                            ui.label("Content:");
+                            ui.text_edit_multiline(&mut self.edit_annotation.content);
+                            ui.end_row();
+                        });
+
+                    ui.separator();
+
+                    ui.horizontal(|ui| {
+                        let save_text = if is_editing { "Update" } else { "Add" };
+                        if ui.button(save_text).clicked() {
+                            self.save_annotation();
+                            if is_editing {
+                                self.show_edit_annotation_dialog = false;
+                            } else {
+                                self.show_add_annotation_dialog = false;
+                            }
+                        }
+
+                        if ui.button("Cancel").clicked() {
+                            if is_editing {
+                                self.show_edit_annotation_dialog = false;
+                            } else {
+                                self.show_add_annotation_dialog = false;
+                            }
+                        }
+                    });
+                });
+        }
+    }
+
+    fn start_editing_annotation(&mut self, annotation: Annotation) {
+        self.edit_annotation_id = Some(annotation.id);
+        self.edit_annotation = EditableAnnotation {
+            title: annotation.title,
+            content: annotation.content,
+            annotation_type: annotation.annotation_type,
+            page_number: annotation.page_number.map_or(String::new(), |p| p.to_string()),
+        };
+        self.show_edit_annotation_dialog = true;
+    }
+
+    fn save_annotation(&mut self) {
+        if let Some(node_id) = self.annotations_node_id {
+            if let Some(node) = self.map.nodes.iter_mut().find(|n| n.id == node_id) {
+                let page_number = if self.edit_annotation.page_number.trim().is_empty() {
+                    None
+                } else {
+                    self.edit_annotation.page_number.parse().ok()
+                };
+
+                let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
+
+                if let Some(edit_id) = self.edit_annotation_id {
+                    // Editing existing annotation
+                    if let Some(annotation) = node.annotations.iter_mut().find(|a| a.id == edit_id) {
+                        annotation.title = self.edit_annotation.title.clone();
+                        annotation.content = self.edit_annotation.content.clone();
+                        annotation.annotation_type = self.edit_annotation.annotation_type.clone();
+                        annotation.page_number = page_number;
+                    }
+                    self.edit_annotation_id = None;
+                } else {
+                    // Adding new annotation
+                    let annotation = Annotation {
+                        id: Uuid::new_v4(),
+                        annotation_type: self.edit_annotation.annotation_type.clone(),
+                        title: self.edit_annotation.title.clone(),
+                        content: self.edit_annotation.content.clone(),
+                        created_at: now,
+                        page_number,
+                    };
+                    node.annotations.push(annotation);
+                }
+
+                self.dirty = true;
             }
         }
     }
@@ -247,6 +560,12 @@ impl Default for MindMapApp {
             show_edit_dialog: false,
             edit_node_id: None,
             edit_metadata: EditableMetadata::default(),
+            show_annotations_panel: false,
+            show_add_annotation_dialog: false,
+            show_edit_annotation_dialog: false,
+            edit_annotation_id: None,
+            edit_annotation: EditableAnnotation::default(),
+            annotations_node_id: None,
         }
     }
 }
@@ -270,6 +589,10 @@ impl eframe::App for MindMapApp {
 
         // Show edit dialog if active
         self.show_edit_dialog(ctx);
+
+        // Show annotation dialogs
+        self.show_annotations_panel(ctx);
+        self.show_annotation_dialog(ctx);
 
         // main panel
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -687,6 +1010,17 @@ impl eframe::App for MindMapApp {
                 };
 
                 painter.rect(node_rect, 5.0, fill, stroke, egui::StrokeKind::Middle);
+
+                // Draw annotation icon if node has annotations
+                if !node.annotations.is_empty(){
+                    let icon_size = egui::vec2(16.0, 16.0) * self.zoom;
+                    let icon_pos = node_rect.right_top() - egui::vec2(5.0, 5.0) * self.zoom;
+                    let icon_rect = egui::Rect::from_min_size(icon_pos, icon_size);
+
+                    // Draw a small rectangle with a note symbol
+                    painter.rect(icon_rect, 5.0, egui::Color32::LIGHT_GRAY, egui::Stroke::new(1.0, egui::Color32::BLACK), egui::StrokeKind::Middle);
+                    painter.text(icon_rect.center(), egui::Align2::CENTER_CENTER, "📝", font_id.clone(), egui::Color32::BLACK);
+                }
 
                 if !node.collapsed && !metadata_galleys.is_empty() {
                     // Draw metadata

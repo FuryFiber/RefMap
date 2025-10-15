@@ -1,8 +1,9 @@
 use crate::core::pdfparser::Metadata;
 use serde::{Serialize, Deserialize};
  use uuid::Uuid;
+use crate::app::Annotation;
 
- #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
  pub struct Node {
      pub id: Uuid,
      pub title: String,
@@ -11,6 +12,7 @@ use serde::{Serialize, Deserialize};
      pub y: f32,
      pub collapsed: bool,
      pub path: Option<String>,
+     pub annotations: Vec<Annotation>, // Add this field
  }
 
  #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,7 +38,8 @@ use serde::{Serialize, Deserialize};
              x,
              y,
              collapsed: true,
-             path: None
+             path: None, 
+             annotations: Vec::new()
          });
          id
      }
@@ -57,7 +60,8 @@ use serde::{Serialize, Deserialize};
                  y,
                  metadata: Some(metadata),
                  collapsed: true,
-                 path: Some(filename.to_string())
+                 path: Some(filename.to_string()),
+                 annotations: Vec::new()
              };
 
              let id = node.id;
