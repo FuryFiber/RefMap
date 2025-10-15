@@ -1,0 +1,66 @@
+{
+  "nodes": [
+    {
+      "id": "9a34fb9a-28a0-4df5-aa6c-f663eb2d6daf",
+      "title": "Zero-Wire: A Deterministic and Low-Latency Wireless Bus Through Symbol-Synchronous Transmission of Optical Signals",
+      "metadata": {
+        "title": "Zero-Wire: A Deterministic and Low-Latency Wireless Bus Through Symbol-Synchronous Transmission of Optical Signals",
+        "keywords": [
+          "Internet of Things",
+          "wireless sensor networks",
+          "cyber-physical systems",
+          "visible light communication",
+          "optical wireless communication",
+          "concurrent transmission",
+          "synchronous transmission",
+          "cut-through forwarding",
+          "bus networks"
+        ],
+        "authors": [
+          "Jonathan Oostvogels; Fan Yang; Sam Michiels; and Danny Hughes"
+        ],
+        "date": "Tue Oct 20 12:17:45 2020 CEST",
+        "path": "/home/flor/Downloads/3384419.3430897.pdf"
+      },
+      "x": 620.8906,
+      "y": 638.22656,
+      "collapsed": true,
+      "path": "/home/flor/Downloads/3384419.3430897.pdf"
+    },
+    {
+      "id": "8ff6144d-8430-462b-9626-6c4c8afbddfc",
+      "title": "New",
+      "metadata": null,
+      "x": 345.2578,
+      "y": 297.16016,
+      "collapsed": true,
+      "path": null
+    },
+    {
+      "id": "a2098ac9-951e-48e8-8a11-3b9c8dda7c60",
+      "title": "New",
+      "metadata": null,
+      "x": 741.85156,
+      "y": 369.7461,
+      "collapsed": true,
+      "path": null
+    }
+  ],
+  "edges": [
+    {
+      "id": "6cbecee0-e6a1-449b-a438-30b2d656854c",
+      "from": "8ff6144d-8430-462b-9626-6c4c8afbddfc",
+      "to": "9a34fb9a-28a0-4df5-aa6c-f663eb2d6daf"
+    },
+    {
+      "id": "d560c134-de5d-4bce-893f-7a7457fb5c16",
+      "from": "a2098ac9-951e-48e8-8a11-3b9c8dda7c60",
+      "to": "9a34fb9a-28a0-4df5-aa6c-f663eb2d6daf"
+    },
+    {
+      "id": "1f5c635a-055b-45c7-a97e-b0d8a416ae88",
+      "from": "8ff6144d-8430-462b-9626-6c4c8afbddfc",
+      "to": "a2098ac9-951e-48e8-8a11-3b9c8dda7c60"
+    }
+  ]
+}
