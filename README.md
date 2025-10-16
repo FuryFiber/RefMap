@@ -24,7 +24,7 @@ It allows users to create a visual overview of the documentation that was gather
 ---
 
 ## Getting Started
-1. **Installation**: build from source using `cargo build --release`.
+1. **Installation**: build from source using `cargo build --release` or run the install script `install.sh` which will build the application and create a `.desktop` entry so RefMap is visible in you launcher.
 2. **Launch**: Run the executable (`refmap` or `refmap.exe`) to start the application.
 
 ---
