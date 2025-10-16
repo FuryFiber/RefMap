@@ -111,8 +111,11 @@ Annotations are color-coded notes attached to specific nodes. Each annotation ty
 ---
 
 ## Zooming and Panning
-- **Zoom**: Use the mouse wheel to zoom in/out.
-- **Pan**: Hold **Middle mouse button** and drag to move the canvas.
+| Mouse               | Trackpad                    | Action          |
+|---------------------|-----------------------------|-----------------|
+| `Scroll`            | `CTRL + Scroll`             | zoom in and out |
+| `Middle click drag` | `CTRL + Primary click drag` | pan             |
+
 
 ---
 
