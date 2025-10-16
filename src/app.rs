@@ -56,8 +56,11 @@ pub struct MindMapApp {
 
     // Right-click context for edges
     rightclick_edge: Option<Uuid>,      // Edge that was right-clicked
-    show_edge_context_menu: bool,      // Whether to show the edge context menu
-    edge_context_menu_pos: Pos2, // Position to show the edge context menu
+    show_edge_context_menu: bool,       // Whether to show the edge context menu
+    edge_context_menu_pos: Pos2,        // Position to show the edge context menu
+
+    show_create_project_prompt: bool,   // Whether to show the prompt
+    pending_pdf_path: Option<String>,   // PDF path to add after project creation
 }
 
 // Helper struct for editing metadata
@@ -211,9 +214,13 @@ impl MindMapApp {
 
                             if node_rect.contains(canvas_pos) {
                                 if let Some(file_path) = &node.path {
-                                    // Open PDF with default system viewer
-                                    if let Err(e) = opener::open(file_path) {
-                                        eprintln!("Failed to open PDF: {}", e);
+                                    if let Some(project_dir) = &self.current_file {
+                                        let full_path = std::path::Path::new(project_dir).join(file_path);
+                                        if let Err(e) = opener::open(full_path.to_str().unwrap()) {
+                                            eprintln!("Failed to open PDF: {}", e);
+                                        }
+                                    } else {
+                                        eprintln!("No project directory set; cannot open PDF.");
                                     }
                                 }
                                 clicked_node = true;
@@ -285,8 +292,23 @@ impl MindMapApp {
                                 .add_filter("PDF", &["pdf"])
                                 .pick_file()
                             {
-                                self.map.add_pdf_node(path.to_str().unwrap(), canvas_pos.x, canvas_pos.y).expect("TODO: panic message");
-                                self.dirty = true;
+                                let path_str = path.to_str().unwrap().to_string();
+                                if let Some(project_dir) = &self.current_file {
+                                    println!("{}", project_dir);
+                                    let pdfs_dir = std::path::Path::new(project_dir).join("pdfs");
+                                    if !pdfs_dir.exists() {
+                                        std::fs::create_dir_all(&pdfs_dir).expect("failed to create pdfs directory");
+                                    }
+                                    let file_name = path.file_name().unwrap().to_str().unwrap();
+                                    let dest_path = pdfs_dir.join(file_name);
+                                    std::fs::copy(&path, &dest_path).expect("failed to copy pdf");
+                                    self.map.add_pdf_node(&format!("{}/{}",pdfs_dir.to_str().unwrap(), file_name), canvas_pos.x, canvas_pos.y).expect("failed to add pdf node");
+                                    self.dirty = true;
+                                } else {
+                                    // Handle case where no project is saved yet
+                                    self.pending_pdf_path = Some(path_str);
+                                    self.show_create_project_prompt = true;
+                                }
                             }
                         }
                     }else{
@@ -688,16 +710,14 @@ impl MindMapApp {
                 ui.menu_button("File", |ui| {
                     if ui.button("New").clicked() {
                         self.map = Default::default();
+                        self.current_file = None;
                         ui.close_kind(UiKind::Menu);
                     }
 
                     if ui.button("Open...").clicked() {
-                        if let Some(path) = FileDialog::new()
-                            .add_filter("Mind Map", &["json"])
-                            .pick_file()
-                        {
-                            if let Ok(loaded_map) = load_map(path.to_str().unwrap()) {
-                                self.current_file = Some(path.to_str().unwrap().to_string());
+                        if let Some(project_dir) = FileDialog::new().pick_folder() {
+                            if let Ok(loaded_map) = load_map(project_dir.to_str().unwrap()) {
+                                self.current_file = Some(project_dir.to_str().unwrap().to_string());
                                 if let Err(e) = save_last_file(&self.current_file.as_ref().unwrap()) {
                                     eprintln!("Failed to save last file: {}", e);
                                 }
@@ -1285,16 +1305,48 @@ impl MindMapApp {
         }
     }
 
+    fn show_crate_project_promt(&mut self, ctx: &egui::Context) {
+        if self.show_create_project_prompt {
+            egui::Window::new("Create Project First")
+                .collapsible(false)
+                .show(ctx, |ui| {
+                    ui.label("You need to create or open a project before adding PDFs.");
+                    if ui.button("Create New Project").clicked() {
+                        self.save(); // This will create a new project and add the pending PDF
+                        self.show_create_project_prompt = false;
+                    }
+                    if ui.button("Cancel").clicked() {
+                        self.show_create_project_prompt = false;
+                        self.pending_pdf_path = None;
+                    }
+                });
+        }
+    }
+
     fn save(&mut self) {
-        if let Some(path) = FileDialog::new()
-            .add_filter("Mind Map", &["json"])
-            .save_file()
-        {
-            self.current_file = Some(path.to_str().unwrap().to_string());
+        if let Some(project_dir) = FileDialog::new().pick_folder() {
+            self.current_file = Some(project_dir.to_str().unwrap().to_string());
             if let Err(e) = save_last_file(&self.current_file.as_ref().unwrap()) {
                 eprintln!("Failed to save last file: {}", e);
             }
-            let _ = save_map(&self.map, path.to_str().unwrap());
+
+            // Save the map
+            if let Err(e) = save_map(&self.map, &project_dir.to_str().unwrap()) {
+                eprintln!("Failed to save map: {}", e);
+            }
+
+            // Handle pending PDF
+            if let Some(pdf_path) = self.pending_pdf_path.take() {
+                let pdfs_dir = std::path::Path::new(&project_dir).join("pdfs");
+                if !pdfs_dir.exists() {
+                    std::fs::create_dir_all(&pdfs_dir).unwrap();
+                }
+                let file_name = std::path::Path::new(&pdf_path).file_name().unwrap().to_str().unwrap();
+                let dest_path = pdfs_dir.join(file_name);
+                std::fs::copy(&pdf_path, &dest_path).unwrap();
+                self.map.add_pdf_node(&format!("{}/{}",pdfs_dir.to_str().unwrap(), file_name), 0.0, 0.0).unwrap();
+                self.dirty = true;
+            }
         }
     }
 
@@ -1387,6 +1439,8 @@ impl Default for MindMapApp {
             rightclick_edge: None,
             show_edge_context_menu: false,
             edge_context_menu_pos: egui::pos2(0.0, 0.0),
+            show_create_project_prompt: false,
+            pending_pdf_path: None,
         };
         // Load last file if it exists
         if let Ok(last_file) = load_last_file() {
@@ -1428,6 +1482,9 @@ impl eframe::App for MindMapApp {
 
         // Edge type selection menu
         self.show_edge_type_menu(ctx);
+
+        // Show create project prompt if needed
+        self.show_crate_project_promt(ctx);
 
         // main panel
         self.main_view(ctx);

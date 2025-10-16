@@ -5,13 +5,44 @@ use anyhow::{Error, Result};
 use toml::Value;
 
 pub fn save_map(map: &MindMap, path: &str) -> Result<()> {
+    let project_dir = std::path::Path::new(path);
+    if !project_dir.exists() {
+        fs::create_dir_all(project_dir)?;
+    }
+
+    let json_path = project_dir.join("map.json");
     let data = serde_json::to_string_pretty(map)?;
-    fs::write(path, data)?;
+    fs::write(&json_path, data)?;
+
+    // Copy PDFs into the project directory's "pdfs" folder
+    let pdfs_dir = project_dir.join("pdfs");
+    if !pdfs_dir.exists() {
+        fs::create_dir_all(&pdfs_dir)?;
+    }
+
+    for node in &map.nodes {
+        if let Some(relative_path) = &node.path {
+            let original_path = std::path::Path::new(relative_path);
+            if original_path.is_relative() {
+                // This is a placeholder; actual implementation depends on tracking original paths
+                // For this example, assume relative paths are already correct
+                continue;
+            }
+            let file_name = original_path.file_name().unwrap().to_str().unwrap();
+            let dest_path = pdfs_dir.join(file_name);
+            if !dest_path.exists() {
+                std::fs::copy(original_path, &dest_path)?;
+            }
+        }
+    }
+
     Ok(())
 }
 
 pub fn load_map(path: &str) -> Result<MindMap> {
-    let data = fs::read_to_string(path)?;
+    let project_dir = std::path::Path::new(path);
+    let json_path = project_dir.join("map.json");
+    let data = fs::read_to_string(&json_path)?;
     let map: MindMap = serde_json::from_str(&data)?;
     Ok(map)
 }
@@ -51,7 +82,6 @@ pub fn save_last_file(path: &str) -> Result<(), Error> {
     }
 
     let config_path = config_dir.join("config.toml");
-
     let mut config: Value = if config_path.exists() {
         let data = fs::read_to_string(&config_path)?;
         toml::from_str(&data)?
@@ -59,15 +89,9 @@ pub fn save_last_file(path: &str) -> Result<(), Error> {
         Value::Table(Default::default())
     };
 
-    // Safely get a mutable reference to the table
-    let table = config.as_table_mut().ok_or_else(|| {
-        Error::msg("Config is not a table")
-    })?;
-
-    // Insert the last_file key
+    let table = config.as_table_mut().ok_or_else(|| Error::msg("Config is not a table"))?;
     table.insert("last_file".to_string(), Value::String(path.to_string()));
 
-    // Write the updated config back to the file
     let encoded = toml::to_string(&config)?;
     fs::write(&config_path, encoded)?;
     Ok(())
