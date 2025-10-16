@@ -17,7 +17,7 @@ pub struct MindMapApp {
     selected_edges: Vec<Uuid>,          // currently selected edges
 
     // For marquee selection
-    marquee_start: Option<Pos2>,  // where the marquee drag started
+    marquee_start: Option<Pos2>,        // where the marquee drag started
     marquee_rect: Option<egui::Rect>,   // current marquee rectangle
 
     // View state
@@ -31,8 +31,8 @@ pub struct MindMapApp {
 
     // Right-click context for nodes
     rightclick_node: Option<Uuid>,      // node that was right-clicked
-    show_node_context_menu: bool,            // whether context menu should be visible
-    context_menu_pos: Pos2,       // position to show context menu
+    show_node_context_menu: bool,       // whether context menu should be visible
+    context_menu_pos: Pos2,             // position to show context menu
 
     // Metadata editing state
     show_edit_dialog: bool,             // whether to show metadata edit dialog
@@ -52,7 +52,7 @@ pub struct MindMapApp {
     pending_edge_to: Option<Uuid>,      // node where edge creation ends
     show_edge_type_menu: bool,          // whether to show edge type selection menu
     selected_edge_type: EdgeType,       // selected edge type for new edge
-    edge_type_menu_pos: Option<Pos2>, // position to show edge type menu
+    edge_type_menu_pos: Option<Pos2>,   // position to show edge type menu
 
     // Right-click context for edges
     rightclick_edge: Option<Uuid>,      // Edge that was right-clicked
@@ -64,13 +64,13 @@ pub struct MindMapApp {
     pending_pdf_path: Option<String>,   // PDF path to add after project creation
 
     // Color picker state
-    show_node_color_picker: bool,            // Whether to show color picker
-    node_color_picker_id: Option<Uuid>,      // Node ID for which color picker is shown
-    selected_node_color: egui::Color32,      // Currently selected color
+    show_node_color_picker: bool,       // Whether to show node color picker
+    node_color_picker_id: Option<Uuid>, // Node ID for which color picker is shown
+    selected_node_color: egui::Color32, // Currently selected color
 
-    show_edge_color_picker: bool,
-    edge_color_picker_id: Option<Uuid>,
-    selected_edge_color: egui::Color32,
+    show_edge_color_picker: bool,       // Whether to show edge color picker
+    edge_color_picker_id: Option<Uuid>, // Edge ID for which color picker is shown
+    selected_edge_color: egui::Color32, // Currently selected edge color
 }
 
 // Helper struct for editing metadata
@@ -504,220 +504,243 @@ impl MindMapApp {
             }
 
             // --- Draw edges ---
-            for edge in &self.map.edges {
-                let from = self.map.nodes.iter().find(|n| n.id == edge.from);
-                let to = self.map.nodes.iter().find(|n| n.id == edge.to);
-                if let (Some(f), Some(t)) = (from, to) {
-                    let p1 = egui::pos2(f.x, f.y) * self.zoom + self.pan + rect.min.to_vec2();
-                    let p2 = egui::pos2(t.x, t.y) * self.zoom + self.pan + rect.min.to_vec2();
-                    let fill = if let Some(edge_color) = edge.color {
-                        edge_color
-                    } else {
-                        egui::Color32::GRAY.to_array()
-                    };
-                    let width = 2.0;
+            self.draw_edges(rect, &painter);
 
-                    // Draw line
-                    painter.line_segment([p1, p2], egui::Stroke::new(width, egui::Color32::from_rgba_unmultiplied(fill[0], fill[1], fill[2], fill[3])));
+            // Draw pending edges
+            self.draw_pending_edges(rect, &painter);
 
-                    // Draw arrowhead for References
-                    if edge.edge_type == EdgeType::References {
-                        let arrow_size = 15.0; // Size of the arrowhead
-                        let angle = std::f32::consts::PI / 6.0; // 30 degrees
-                        let dir = (p2 - p1).normalized(); // Direction of the edge
-                        let perp = egui::Vec2::new(-dir.y, dir.x); // Perpendicular vector
+            // --- Draw temporary connection line (while dragging) ---
+            self.draw_connection_line(rect, &painter, &response);
 
-                        // Calculate the midpoint of the edge
-                        let midpoint = (p1 + p2.to_vec2()) * 0.5;
+            // --- Draw nodes ---
+            self.draw_nodes(rect, &painter, ctx);
 
-                        // Calculate the arrowhead points
-                        let p1_arrow = midpoint - dir * arrow_size * 0.5; // Base of the arrowhead
-                        let p2_arrow = midpoint + dir * arrow_size * 0.5; // Tip of the arrowhead
-                        let p3_arrow = p1_arrow + perp * arrow_size * angle.tan(); // One side of the arrowhead
-                        let p4_arrow = p1_arrow - perp * arrow_size * angle.tan(); // Other side of the arrowhead
+            // --- Draw marquee rectangle ---
+            self.draw_marquee_rect(&painter);
+        });
+    }
 
-                        let width = 3.0; // Stroke width
-                        painter.line_segment([p2_arrow, p3_arrow], egui::Stroke::new(width, egui::Color32::from_rgba_unmultiplied(fill[0], fill[1], fill[2], fill[3]))); // Line from tip to one side
-                        painter.line_segment([p2_arrow, p4_arrow], egui::Stroke::new(width, egui::Color32::from_rgba_unmultiplied(fill[0], fill[1], fill[2], fill[3]))); // Line from tip to other side
-                    }
+    fn draw_edges(&mut self, rect: egui::Rect, painter: &egui::Painter) {
+        for edge in &self.map.edges {
+            let from = self.map.nodes.iter().find(|n| n.id == edge.from);
+            let to = self.map.nodes.iter().find(|n| n.id == edge.to);
+            if let (Some(f), Some(t)) = (from, to) {
+                let p1 = egui::pos2(f.x, f.y) * self.zoom + self.pan + rect.min.to_vec2();
+                let p2 = egui::pos2(t.x, t.y) * self.zoom + self.pan + rect.min.to_vec2();
+                let fill = if let Some(edge_color) = edge.color {
+                    edge_color
+                } else {
+                    egui::Color32::GRAY.to_array()
+                };
+                let mut width = 2.0;
+                if self.selected_edges.contains(&edge.id) {
+                    width = 3.0;
+                }
+
+                // Draw line
+                painter.line_segment([p1, p2], egui::Stroke::new(width, egui::Color32::from_rgba_unmultiplied(fill[0], fill[1], fill[2], fill[3])));
+
+                // Draw arrowhead for References
+                if edge.edge_type == EdgeType::References {
+                    let arrow_size = 15.0; // Size of the arrowhead
+                    let angle = std::f32::consts::PI / 6.0; // 30 degrees
+                    let dir = (p2 - p1).normalized(); // Direction of the edge
+                    let perp = egui::Vec2::new(-dir.y, dir.x); // Perpendicular vector
+
+                    // Calculate the midpoint of the edge
+                    let midpoint = (p1 + p2.to_vec2()) * 0.5;
+
+                    // Calculate the arrowhead points
+                    let p1_arrow = midpoint - dir * arrow_size * 0.5; // Base of the arrowhead
+                    let p2_arrow = midpoint + dir * arrow_size * 0.5; // Tip of the arrowhead
+                    let p3_arrow = p1_arrow + perp * arrow_size * angle.tan(); // One side of the arrowhead
+                    let p4_arrow = p1_arrow - perp * arrow_size * angle.tan(); // Other side of the arrowhead
+
+                    painter.line_segment([p2_arrow, p3_arrow], egui::Stroke::new(width, egui::Color32::from_rgba_unmultiplied(fill[0], fill[1], fill[2], fill[3]))); // Line from tip to one side
+                    painter.line_segment([p2_arrow, p4_arrow], egui::Stroke::new(width, egui::Color32::from_rgba_unmultiplied(fill[0], fill[1], fill[2], fill[3]))); // Line from tip to other side
                 }
             }
+        }
+    }
 
-            if let (Some(from), Some(to)) = (self.pending_edge_from, self.pending_edge_to) {
-                if let (Some(f), Some(t)) = (
-                    self.map.nodes.iter().find(|n| n.id == from),
-                    self.map.nodes.iter().find(|n| n.id == to),
-                ) {
-                    let p1 = egui::pos2(f.x, f.y) * self.zoom + self.pan + rect.min.to_vec2();
-                    let p2 = egui::pos2(t.x, t.y) * self.zoom + self.pan + rect.min.to_vec2();
+    fn draw_pending_edges(&mut self, rect: egui::Rect, painter: &egui::Painter) {
+        if let (Some(from), Some(to)) = (self.pending_edge_from, self.pending_edge_to) {
+            if let (Some(f), Some(t)) = (
+                self.map.nodes.iter().find(|n| n.id == from),
+                self.map.nodes.iter().find(|n| n.id == to),
+            ) {
+                let p1 = egui::pos2(f.x, f.y) * self.zoom + self.pan + rect.min.to_vec2();
+                let p2 = egui::pos2(t.x, t.y) * self.zoom + self.pan + rect.min.to_vec2();
+                painter.line_segment([p1, p2], egui::Stroke::new(1.5, egui::Color32::LIGHT_GRAY));
+            }
+        }
+    }
+
+    fn draw_connection_line(&mut self, rect: egui::Rect, painter: &egui::Painter, response: &egui::Response) {
+        if let Some(start_id) = self.connecting_from {
+            if let Some(pointer_pos) = response.interact_pointer_pos() {
+                if let Some(start_node) = self.map.nodes.iter().find(|n| n.id == start_id) {
+                    let p1 = egui::pos2(start_node.x, start_node.y) * self.zoom
+                        + self.pan
+                        + rect.min.to_vec2();
+                    let p2 = pointer_pos;
                     painter.line_segment([p1, p2], egui::Stroke::new(1.5, egui::Color32::LIGHT_GRAY));
                 }
             }
+        }
+    }
 
-            // --- Draw temporary connection line (while dragging) ---
-            if let Some(start_id) = self.connecting_from {
-                if let Some(pointer_pos) = response.interact_pointer_pos() {
-                    if let Some(start_node) = self.map.nodes.iter().find(|n| n.id == start_id) {
-                        let p1 = egui::pos2(start_node.x, start_node.y) * self.zoom
-                            + self.pan
-                            + rect.min.to_vec2();
-                        let p2 = pointer_pos;
-                        painter.line_segment([p1, p2], egui::Stroke::new(1.5, egui::Color32::LIGHT_GRAY));
+    fn draw_nodes(&mut self, rect: egui::Rect, painter: &egui::Painter, ctx: &egui::Context) {
+        for node in &mut self.map.nodes {
+            let pos = egui::pos2(node.x, node.y) * self.zoom + self.pan + rect.min.to_vec2();
+            let font_id = egui::FontId::proportional(14.0 * self.zoom);
+            let bold_font_id = egui::FontId::monospace(14.0 * self.zoom);
+
+            let padding = egui::vec2(16.0, 12.0) * self.zoom;
+
+            // Calculate node size based on collapse state
+            let mut node_size = if node.collapsed {
+                // When collapsed, size based on title
+                let title_galley = ctx.fonts_mut(|f| f.layout_no_wrap(node.title.clone(), font_id.clone(), egui::Color32::BLACK));
+                let text_size = title_galley.size();
+                egui::vec2(text_size.x + padding.x * 2.0, text_size.y + padding.y)
+            } else {
+                // When expanded, use minimum width or title width, whichever is larger
+                let title_galley = ctx.fonts_mut(|f| f.layout_no_wrap(node.title.clone(), font_id.clone(), egui::Color32::BLACK));
+                let title_width = title_galley.size().x + padding.x * 2.0;
+                let min_width = 300.0 * self.zoom;
+                let node_width = title_width.max(min_width);
+                egui::vec2(node_width, 0.0) // Height will be calculated below
+            };
+
+            let mut metadata_galleys = Vec::new();
+            if !node.collapsed {
+                if let Some(metadata) = &node.metadata {
+                    let max_width = node_size.x - padding.x * 2.0;
+
+                    // Create layout for each metadata field
+                    let authors_str = metadata.authors.join(", ");
+                    let keywords_str = metadata.keywords.join(", ");
+                    let fields = vec![
+                        ("Title: ", &metadata.title),
+                        ("Authors: ", &authors_str),
+                        ("Keywords: ", &keywords_str),
+                        ("Date: ", &metadata.date),
+                    ];
+
+                    // Find the widest label to align all values
+                    let label_width = Self::find_widest_label(ctx, fields.clone(), self.zoom);
+
+                    for (label, value) in fields {
+                        // Create label galley (bold)
+                        let label_galley = ctx.fonts_mut(|f|
+                            f.layout_no_wrap(label.to_string(), bold_font_id.clone(), egui::Color32::BLACK)
+                        );
+
+                        // Create wrapped value galley with remaining width
+                        let value_galley = ctx.fonts_mut(|f|
+                            f.layout(
+                                value.to_string(),
+                                font_id.clone(),
+                                egui::Color32::BLACK,
+                                max_width - label_width
+                            )
+                        );
+
+                        metadata_galleys.push((label_galley, value_galley, label_width));
                     }
+
+                    // Calculate total height needed
+                    let line_spacing = 4.0 * self.zoom;
+                    node_size.y = padding.y;
+                    for (_, value_galley, _) in &metadata_galleys {
+                        node_size.y += value_galley.size().y + line_spacing;
+                    }
+                    node_size.y += padding.y;
+                } else {
+                    // No metadata, just show title with calculated width
+                    let title_galley = ctx.fonts_mut(|f| f.layout_no_wrap(node.title.clone(), font_id.clone(), egui::Color32::BLACK));
+                    node_size.y = title_galley.size().y + padding.y;
                 }
             }
 
-            // --- Draw nodes ---
-            for node in &mut self.map.nodes {
-                let pos = egui::pos2(node.x, node.y) * self.zoom + self.pan + rect.min.to_vec2();
-                let font_id = egui::FontId::proportional(14.0 * self.zoom);
-                let bold_font_id = egui::FontId::monospace(14.0 * self.zoom);
+            let node_rect = egui::Rect::from_center_size(pos, node_size);
 
-                let padding = egui::vec2(16.0, 12.0) * self.zoom;
-
-                // Calculate node size based on collapse state
-                let mut node_size = if node.collapsed {
-                    // When collapsed, size based on title
-                    let title_galley = ctx.fonts_mut(|f| f.layout_no_wrap(node.title.clone(), font_id.clone(), egui::Color32::BLACK));
-                    let text_size = title_galley.size();
-                    egui::vec2(text_size.x + padding.x * 2.0, text_size.y + padding.y)
+            // Draw node background
+            let fill = if let Some(color) = node.color {
+                color
+            } else {
+                if self.selected_nodes.contains(&node.id) {
+                    egui::Color32::from_rgb(180, 220, 255).to_array()
                 } else {
-                    // When expanded, use minimum width or title width, whichever is larger
-                    let title_galley = ctx.fonts_mut(|f| f.layout_no_wrap(node.title.clone(), font_id.clone(), egui::Color32::BLACK));
-                    let title_width = title_galley.size().x + padding.x * 2.0;
-                    let min_width = 300.0 * self.zoom;
-                    let node_width = title_width.max(min_width);
-                    egui::vec2(node_width, 0.0) // Height will be calculated below
-                };
-
-                let mut metadata_galleys = Vec::new();
-                if !node.collapsed {
-                    if let Some(metadata) = &node.metadata {
-                        let max_width = node_size.x - padding.x * 2.0;
-
-                        // Create layout for each metadata field
-                        let authors_str = metadata.authors.join(", ");
-                        let keywords_str = metadata.keywords.join(", ");
-                        let fields = vec![
-                            ("Title: ", &metadata.title),
-                            ("Authors: ", &authors_str),
-                            ("Keywords: ", &keywords_str),
-                            ("Date: ", &metadata.date),
-                        ];
-
-                        // Find the widest label to align all values
-                        let label_width = Self::find_widest_label(ctx, fields.clone(), self.zoom);
-
-                        for (label, value) in fields {
-                            // Create label galley (bold)
-                            let label_galley = ctx.fonts_mut(|f|
-                                f.layout_no_wrap(label.to_string(), bold_font_id.clone(), egui::Color32::BLACK)
-                            );
-
-                            // Create wrapped value galley with remaining width
-                            let value_galley = ctx.fonts_mut(|f|
-                                f.layout(
-                                    value.to_string(),
-                                    font_id.clone(),
-                                    egui::Color32::BLACK,
-                                    max_width - label_width
-                                )
-                            );
-
-                            metadata_galleys.push((label_galley, value_galley, label_width));
-                        }
-
-                        // Calculate total height needed
-                        let line_spacing = 4.0 * self.zoom;
-                        node_size.y = padding.y;
-                        for (_, value_galley, _) in &metadata_galleys {
-                            node_size.y += value_galley.size().y + line_spacing;
-                        }
-                        node_size.y += padding.y;
-                    } else {
-                        // No metadata, just show title with calculated width
-                        let title_galley = ctx.fonts_mut(|f| f.layout_no_wrap(node.title.clone(), font_id.clone(), egui::Color32::BLACK));
-                        node_size.y = title_galley.size().y + padding.y;
-                    }
+                    egui::Color32::LIGHT_BLUE.to_array()
                 }
+            };
+            let stroke = if self.selected_nodes.contains(&node.id) {
+                egui::Stroke::new(3.0, egui::Color32::from_rgb(0, 100, 255))
+            } else {
+                egui::Stroke::new(1.0, egui::Color32::BLACK)
+            };
 
-                let node_rect = egui::Rect::from_center_size(pos, node_size);
+            painter.rect(node_rect, 5.0, egui::Color32::from_rgba_unmultiplied(fill[0], fill[1], fill[2], fill[3]), stroke, egui::StrokeKind::Middle);
 
-                // Draw node background
-                let fill = if let Some(color) = node.color {
-                    color
-                } else {
-                    if self.selected_nodes.contains(&node.id) {
-                        egui::Color32::from_rgb(180, 220, 255).to_array()
-                    } else {
-                        egui::Color32::LIGHT_BLUE.to_array()
-                    }
-                };
-                let stroke = if self.selected_nodes.contains(&node.id) {
-                    egui::Stroke::new(3.0, egui::Color32::from_rgb(0, 100, 255))
-                } else {
-                    egui::Stroke::new(1.0, egui::Color32::BLACK)
-                };
+            // Draw annotation icon if node has annotations
+            if !node.annotations.is_empty(){
+                let icon_size = egui::vec2(16.0, 16.0) * self.zoom;
+                let icon_pos = node_rect.right_top() - egui::vec2(5.0, 5.0) * self.zoom;
+                let icon_rect = egui::Rect::from_min_size(icon_pos, icon_size);
 
-                painter.rect(node_rect, 5.0, egui::Color32::from_rgba_unmultiplied(fill[0], fill[1], fill[2], fill[3]), stroke, egui::StrokeKind::Middle);
+                // Draw a small rectangle with a note symbol
+                painter.rect(icon_rect, 5.0, egui::Color32::LIGHT_GRAY, egui::Stroke::new(1.0, egui::Color32::BLACK), egui::StrokeKind::Middle);
+                painter.text(icon_rect.center(), egui::Align2::CENTER_CENTER, "📝", font_id.clone(), egui::Color32::BLACK);
+            }
 
-                // Draw annotation icon if node has annotations
-                if !node.annotations.is_empty(){
-                    let icon_size = egui::vec2(16.0, 16.0) * self.zoom;
-                    let icon_pos = node_rect.right_top() - egui::vec2(5.0, 5.0) * self.zoom;
-                    let icon_rect = egui::Rect::from_min_size(icon_pos, icon_size);
+            if !node.collapsed && !metadata_galleys.is_empty() {
+                // Draw metadata
+                let mut y_offset = -node_size.y/2.0 + padding.y;
+                let x_pos = pos.x - node_size.x/2.0 + padding.x;
 
-                    // Draw a small rectangle with a note symbol
-                    painter.rect(icon_rect, 5.0, egui::Color32::LIGHT_GRAY, egui::Stroke::new(1.0, egui::Color32::BLACK), egui::StrokeKind::Middle);
-                    painter.text(icon_rect.center(), egui::Align2::CENTER_CENTER, "📝", font_id.clone(), egui::Color32::BLACK);
-                }
-
-                if !node.collapsed && !metadata_galleys.is_empty() {
-                    // Draw metadata
-                    let mut y_offset = -node_size.y/2.0 + padding.y;
-                    let x_pos = pos.x - node_size.x/2.0 + padding.x;
-
-                    for (label_galley, value_galley, label_width) in metadata_galleys {
-                        // Draw label (bold)
-                        painter.galley(
-                            egui::pos2(x_pos, pos.y + y_offset),
-                            label_galley.clone(),
-                            egui::Color32::BLACK
-                        );
-
-                        // Draw value (normal, wrapped) aligned after the widest label
-                        painter.galley(
-                            egui::pos2(x_pos + label_width, pos.y + y_offset),
-                            value_galley.clone(),
-                            egui::Color32::BLACK
-                        );
-
-                        y_offset += value_galley.size().y + 4.0 * self.zoom;
-                    }
-                } else {
-                    // Draw just the title
-                    painter.text(
-                        pos,
-                        egui::Align2::CENTER_CENTER,
-                        &node.title,
-                        font_id.clone(),
-                        egui::Color32::BLACK,
+                for (label_galley, value_galley, label_width) in metadata_galleys {
+                    // Draw label (bold)
+                    painter.galley(
+                        egui::pos2(x_pos, pos.y + y_offset),
+                        label_galley.clone(),
+                        egui::Color32::BLACK
                     );
+
+                    // Draw value (normal, wrapped) aligned after the widest label
+                    painter.galley(
+                        egui::pos2(x_pos + label_width, pos.y + y_offset),
+                        value_galley.clone(),
+                        egui::Color32::BLACK
+                    );
+
+                    y_offset += value_galley.size().y + 4.0 * self.zoom;
                 }
-            }
-
-
-            // --- Draw marquee rectangle ---
-            if let Some(rect) = self.marquee_rect {
-                painter.rect_stroke(
-                    rect,
-                    0.0,
-                    egui::Stroke::new(1.5, egui::Color32::from_rgb(100, 150, 250)),
-                    egui::StrokeKind::Middle
+            } else {
+                // Draw just the title
+                painter.text(
+                    pos,
+                    egui::Align2::CENTER_CENTER,
+                    &node.title,
+                    font_id.clone(),
+                    egui::Color32::BLACK,
                 );
             }
-        });
+        }
     }
+
+    fn draw_marquee_rect(&mut self, painter: &egui::Painter) {
+        if let Some(rect) = self.marquee_rect {
+            painter.rect_stroke(
+                rect,
+                0.0,
+                egui::Stroke::new(1.5, egui::Color32::from_rgb(100, 150, 250)),
+                egui::StrokeKind::Middle
+            );
+        }
+    }
+
     fn menu_bar(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
@@ -839,7 +862,86 @@ impl MindMapApp {
         }
     }
 
-    // Show annotations panel
+    fn show_edge_context_menu(&mut self, ctx: &egui::Context) {
+        if self.show_edge_context_menu {
+            let menu_rect = egui::Rect::from_min_size(self.edge_context_menu_pos, egui::vec2(150.0, 100.0));
+
+            egui::Area::new(Id::from("edge_context_menu"))
+                .fixed_pos(self.edge_context_menu_pos)
+                .order(egui::Order::Tooltip)
+                .show(ctx, |ui| {
+                    egui::Frame::popup(ui.style())
+                        .show(ui, |ui| {
+                            ui.set_min_width(150.0);
+
+                            // Option to change edge type
+                            if ui.button("Change Edge Type").clicked() {
+                                if let Some(edge_id) = self.rightclick_edge {
+                                    if let Some(edge) = self.map.edges.iter_mut().find(|e| e.id == edge_id) {
+                                        self.selected_edge_type = edge.edge_type.clone();
+                                        self.show_edge_type_menu = true;
+                                    }
+                                }
+                                self.show_edge_context_menu = false;
+                            }
+
+                            // Option to add annotation
+                            if ui.button("Add Annotation").clicked() {
+                                if let Some(edge_id) = self.rightclick_edge {
+                                    self.edit_annotation = EditableAnnotation::default();
+                                    self.show_add_annotation_dialog = true;
+                                    self.rightclick_edge = Some(edge_id);
+                                }
+                                self.show_edge_context_menu = false;
+                            }
+
+                            // Option to view annotations
+                            if ui.button("View Annotations").clicked() {
+                                self.show_annotations_panel = true;
+                                self.show_edge_context_menu = false;
+                            }
+
+                            if ui.button("Change Color").clicked() {
+                                self.edge_color_picker_id = Some(self.rightclick_edge.unwrap());
+                                self.show_edge_color_picker = true;
+
+                                if let Some(edge) = self.map.edges.iter().find(|n| n.id == self.edge_color_picker_id.unwrap()) {
+                                    self.selected_edge_color = egui::Color32::from_rgba_unmultiplied(edge.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[0],
+                                                                                                     edge.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[1],
+                                                                                                     edge.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[2],
+                                                                                                     edge.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[3]);
+                                } else {
+                                    self.selected_edge_color = egui::Color32::LIGHT_BLUE;
+                                }
+
+                                self.show_edge_context_menu = false;
+                            }
+
+                            ui.separator();
+
+
+                            // Option to delete edge
+                            if ui.button("Delete Edge").clicked() {
+                                if let Some(edge_id) = self.rightclick_edge {
+                                    self.map.edges.retain(|e| e.id != edge_id);
+                                    self.dirty = true;
+                                }
+                                self.show_edge_context_menu = false;
+                            }
+                        });
+                });
+
+            // Close menu if clicked elsewhere
+            if ctx.input(|i| i.pointer.any_click()) {
+                if let Some(pointer_pos) = ctx.input(|i| i.pointer.interact_pos()) {
+                    if !menu_rect.contains(pointer_pos) {
+                        self.show_edge_context_menu = false;
+                    }
+                }
+            }
+        }
+    }
+
     fn show_annotations_panel(&mut self, ctx: &egui::Context) {
         if self.show_annotations_panel {
             if let Some(node_id) = self.annotations_node_id {
@@ -921,7 +1023,6 @@ impl MindMapApp {
         }
     }
 
-    // Show individual annotation card
     fn show_annotation_card(&mut self, ui: &mut egui::Ui, annotation: &Annotation, id: Uuid) {
         let frame = egui::Frame::new()
             .inner_margin(egui::Margin::same(8))
@@ -965,7 +1066,6 @@ impl MindMapApp {
         });
     }
 
-    // Show add/edit annotation dialog
     fn show_annotation_dialog(&mut self, ctx: &egui::Context) {
         let is_editing = self.show_edit_annotation_dialog;
         let show_dialog = self.show_add_annotation_dialog || is_editing;
@@ -1239,86 +1339,6 @@ impl MindMapApp {
         self.show_edge_type_menu = false;
         self.pending_edge_from = None;
         self.pending_edge_to = None;
-    }
-
-    fn show_edge_context_menu(&mut self, ctx: &egui::Context) {
-        if self.show_edge_context_menu {
-            let menu_rect = egui::Rect::from_min_size(self.edge_context_menu_pos, egui::vec2(150.0, 100.0));
-
-            egui::Area::new(Id::from("edge_context_menu"))
-                .fixed_pos(self.edge_context_menu_pos)
-                .order(egui::Order::Tooltip)
-                .show(ctx, |ui| {
-                    egui::Frame::popup(ui.style())
-                        .show(ui, |ui| {
-                            ui.set_min_width(150.0);
-
-                            // Option to change edge type
-                            if ui.button("Change Edge Type").clicked() {
-                                if let Some(edge_id) = self.rightclick_edge {
-                                    if let Some(edge) = self.map.edges.iter_mut().find(|e| e.id == edge_id) {
-                                        self.selected_edge_type = edge.edge_type.clone();
-                                        self.show_edge_type_menu = true;
-                                    }
-                                }
-                                self.show_edge_context_menu = false;
-                            }
-
-                            // Option to add annotation
-                            if ui.button("Add Annotation").clicked() {
-                                if let Some(edge_id) = self.rightclick_edge {
-                                    self.edit_annotation = EditableAnnotation::default();
-                                    self.show_add_annotation_dialog = true;
-                                    self.rightclick_edge = Some(edge_id);
-                                }
-                                self.show_edge_context_menu = false;
-                            }
-
-                            // Option to view annotations
-                            if ui.button("View Annotations").clicked() {
-                                self.show_annotations_panel = true;
-                                self.show_edge_context_menu = false;
-                            }
-
-                            if ui.button("Change Color").clicked() {
-                                self.edge_color_picker_id = Some(self.rightclick_edge.unwrap());
-                                self.show_edge_color_picker = true;
-
-                                if let Some(edge) = self.map.edges.iter().find(|n| n.id == self.edge_color_picker_id.unwrap()) {
-                                    self.selected_edge_color = egui::Color32::from_rgba_unmultiplied(edge.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[0],
-                                                                                                     edge.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[1],
-                                                                                                     edge.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[2],
-                                                                                                     edge.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[3]);
-                                } else {
-                                    self.selected_edge_color = egui::Color32::LIGHT_BLUE;
-                                }
-
-                                self.show_edge_context_menu = false;
-                            }
-
-                            ui.separator();
-
-
-                            // Option to delete edge
-                            if ui.button("Delete Edge").clicked() {
-                                if let Some(edge_id) = self.rightclick_edge {
-                                    self.map.edges.retain(|e| e.id != edge_id);
-                                    self.dirty = true;
-                                }
-                                self.show_edge_context_menu = false;
-                            }
-                        });
-                });
-
-            // Close menu if clicked elsewhere
-            if ctx.input(|i| i.pointer.any_click()) {
-                if let Some(pointer_pos) = ctx.input(|i| i.pointer.interact_pos()) {
-                    if !menu_rect.contains(pointer_pos) {
-                        self.show_edge_context_menu = false;
-                    }
-                }
-            }
-        }
     }
 
     fn show_edge_type_menu(&mut self, ctx: &egui::Context) {
