@@ -926,13 +926,40 @@ impl eframe::App for MindMapApp {
                         }
                     }
                     else if ctx.input(|i| i.modifiers.shift) {
-                        // Shift + left click → open PDF file picker
-                        if let Some(path) = FileDialog::new()
-                            .add_filter("PDF", &["pdf"])
-                            .pick_file()
-                        {
-                            self.map.add_pdf_node(path.to_str().unwrap(), canvas_pos.x, canvas_pos.y).expect("TODO: panic message");
-                            self.dirty = true;
+                        let mut clicked_any: bool = false;
+                        for node in &self.map.nodes {
+                            let node_rect = get_node_rect(ctx, node, self.zoom);
+                            if node_rect.contains(canvas_pos) {
+                                self.selected_nodes.push(node.id);
+                                clicked_any = true;
+                                break;
+                            }
+                        }
+                        for edge in &self.map.edges {
+                            let from = self.map.nodes.iter().find(|n| n.id == edge.from);
+                            let to = self.map.nodes.iter().find(|n| n.id == edge.to);
+                            if let (Some(f), Some(t)) = (from, to) {
+                                let dist = point_line_distance(
+                                    egui::pos2(f.x, f.y),
+                                    egui::pos2(t.x, t.y),
+                                    canvas_pos,
+                                );
+                                if dist < 8.0 {
+                                    self.selected_edges.push(edge.id);
+                                    clicked_any = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if !clicked_any {
+                            // Shift + left click → open PDF file picker
+                            if let Some(path) = FileDialog::new()
+                                .add_filter("PDF", &["pdf"])
+                                .pick_file()
+                            {
+                                self.map.add_pdf_node(path.to_str().unwrap(), canvas_pos.x, canvas_pos.y).expect("TODO: panic message");
+                                self.dirty = true;
+                            }
                         }
                     }else{
                         // Check if clicked on a node
@@ -979,39 +1006,65 @@ impl eframe::App for MindMapApp {
 
                 // Drag existing node with left mouse
                 if response.dragged_by(egui::PointerButton::Primary) {
-                    let pointer_pos = response.interact_pointer_pos().unwrap();
-
-                    if let Some(id) = self.dragging_node {
-                        if let Some(node) = self.map.nodes.iter_mut().find(|n| n.id == id) {
-                            node.x += response.drag_delta().x / self.zoom;
-                            node.y += response.drag_delta().y / self.zoom;
-                            self.dirty = true;
-                        }
-                    } else {
+                    if ctx.input(|i| i.modifiers.ctrl) {
+                        // start connection from node under cursor
                         for node in &self.map.nodes {
-                            let rect = get_node_rect(ctx, node, self.zoom);
-                            if rect.contains(canvas_pos) && self.marquee_rect == None {
-                                self.dragging_node = Some(node.id);
+                            let node_rect = get_node_rect(ctx, node, self.zoom);
+                            if node_rect.contains(canvas_pos) {
+                                self.connecting_from = Some(node.id);
                                 break;
                             }
                         }
-                    }
+                    }else {
+                        let pointer_pos = response.interact_pointer_pos().unwrap();
 
-                    if self.dragging_node.is_none() {
-                        // Start or continue marquee
-                        if self.marquee_start.is_none() {
-                            self.marquee_start = Some(pointer_pos);
+                        if let Some(id) = self.dragging_node {
+                            if let Some(node) = self.map.nodes.iter_mut().find(|n| n.id == id) {
+                                node.x += response.drag_delta().x / self.zoom;
+                                node.y += response.drag_delta().y / self.zoom;
+                                self.dirty = true;
+                            }
+                        } else {
+                            for node in &self.map.nodes {
+                                let rect = get_node_rect(ctx, node, self.zoom);
+                                if rect.contains(canvas_pos) && self.marquee_rect == None {
+                                    self.dragging_node = Some(node.id);
+                                    break;
+                                }
+                            }
                         }
-                        self.marquee_rect = Some(egui::Rect::from_two_pos(
-                            self.marquee_start.unwrap(),
-                            pointer_pos,
-                        ));
+                        if self.dragging_node.is_none() {
+                            // Start or continue marquee
+                            if self.marquee_start.is_none() {
+                                self.marquee_start = Some(pointer_pos);
+                            }
+                            self.marquee_rect = Some(egui::Rect::from_two_pos(
+                                self.marquee_start.unwrap(),
+                                pointer_pos,
+                            ));
+                        }
                     }
                 }
 
                 // When left button released
                 if response.drag_stopped_by(egui::PointerButton::Primary) {
-                    if let Some(rect) = self.marquee_rect.take() {
+                    if let Some(start_id) = self.connecting_from.take() {
+                        let mut found_to_id = None;
+                        for node in &self.map.nodes {
+                            let node_rect = get_node_rect(ctx, node, self.zoom);
+                            if node_rect.contains(canvas_pos) && node.id != start_id {
+                                found_to_id = Some(node.id);
+                                break;
+                            }
+                        }
+
+                        if let Some(to_id) = found_to_id {
+                            self.pending_edge_from = Some(start_id);
+                            self.pending_edge_to = Some(to_id);
+                            self.show_edge_type_menu = true;
+                            self.edge_type_menu_pos = ctx.input(|i| i.pointer.hover_pos());
+                        }
+                    } else if let Some(rect) = self.marquee_rect.take() {
                         // Convert rect to canvas coordinates
                         let rect_min = (rect.min - response.rect.min.to_vec2() - self.pan) / self.zoom;
                         let rect_max = (rect.max - response.rect.min.to_vec2() - self.pan) / self.zoom;
@@ -1044,6 +1097,7 @@ impl eframe::App for MindMapApp {
 
                         self.marquee_start = None;
                     }
+                    
                     self.dragging_node = None;
                 }
 
