@@ -154,12 +154,3 @@ Annotations are color-coded notes attached to specific nodes. Each annotation ty
 
 ### Missing Metadata
 - PDF metadata extraction requires valid XMP data. Some PDFs may not contain extractable metadata. In this case, manually edit the node to add information.
-
----
-
-## Support and Feedback
-For issues or feature requests, visit the [GitHub repository](https://github.com/yourusername/refmap).
-
----
-
-*Last Updated: [Insert Date]*
