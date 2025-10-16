@@ -64,9 +64,13 @@ pub struct MindMapApp {
     pending_pdf_path: Option<String>,   // PDF path to add after project creation
 
     // Color picker state
-    show_color_picker: bool,            // Whether to show color picker
-    color_picker_id: Option<Uuid>,      // Node ID for which color picker is shown
-    selected_color: egui::Color32,      // Currently selected color
+    show_node_color_picker: bool,            // Whether to show color picker
+    node_color_picker_id: Option<Uuid>,      // Node ID for which color picker is shown
+    selected_node_color: egui::Color32,      // Currently selected color
+
+    show_edge_color_picker: bool,
+    edge_color_picker_id: Option<Uuid>,
+    selected_edge_color: egui::Color32,
 }
 
 // Helper struct for editing metadata
@@ -506,15 +510,15 @@ impl MindMapApp {
                 if let (Some(f), Some(t)) = (from, to) {
                     let p1 = egui::pos2(f.x, f.y) * self.zoom + self.pan + rect.min.to_vec2();
                     let p2 = egui::pos2(t.x, t.y) * self.zoom + self.pan + rect.min.to_vec2();
-                    let color = if self.selected_edges.contains(&edge.id) {
-                        egui::Color32::WHITE
+                    let fill = if let Some(edge_color) = edge.color {
+                        edge_color
                     } else {
-                        egui::Color32::DARK_GRAY
+                        egui::Color32::GRAY.to_array()
                     };
                     let width = 2.0;
 
                     // Draw line
-                    painter.line_segment([p1, p2], egui::Stroke::new(width, color));
+                    painter.line_segment([p1, p2], egui::Stroke::new(width, egui::Color32::from_rgba_unmultiplied(fill[0], fill[1], fill[2], fill[3])));
 
                     // Draw arrowhead for References
                     if edge.edge_type == EdgeType::References {
@@ -533,8 +537,8 @@ impl MindMapApp {
                         let p4_arrow = p1_arrow - perp * arrow_size * angle.tan(); // Other side of the arrowhead
 
                         let width = 3.0; // Stroke width
-                        painter.line_segment([p2_arrow, p3_arrow], egui::Stroke::new(width, color)); // Line from tip to one side
-                        painter.line_segment([p2_arrow, p4_arrow], egui::Stroke::new(width, color)); // Line from tip to other side
+                        painter.line_segment([p2_arrow, p3_arrow], egui::Stroke::new(width, egui::Color32::from_rgba_unmultiplied(fill[0], fill[1], fill[2], fill[3]))); // Line from tip to one side
+                        painter.line_segment([p2_arrow, p4_arrow], egui::Stroke::new(width, egui::Color32::from_rgba_unmultiplied(fill[0], fill[1], fill[2], fill[3]))); // Line from tip to other side
                     }
                 }
             }
@@ -797,8 +801,18 @@ impl MindMapApp {
                             }
 
                             if ui.button("Change Color").clicked() {
-                                self.color_picker_id = Some(self.rightclick_node.unwrap());
-                                self.show_color_picker = true;
+                                self.node_color_picker_id = Some(self.rightclick_node.unwrap());
+                                self.show_node_color_picker = true;
+
+                                if let Some(node) = self.map.nodes.iter().find(|n| n.id == self.node_color_picker_id.unwrap()) {
+                                    self.selected_node_color = egui::Color32::from_rgba_unmultiplied(node.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[0],
+                                                                                                  node.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[1],
+                                                                                                  node.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[2],
+                                                                                                  node.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[3]);
+                                } else {
+                                    self.selected_node_color = egui::Color32::LIGHT_BLUE;
+                                }
+
                                 self.show_node_context_menu = false;
                             }
 
@@ -1266,6 +1280,25 @@ impl MindMapApp {
                                 self.show_edge_context_menu = false;
                             }
 
+                            if ui.button("Change Color").clicked() {
+                                self.edge_color_picker_id = Some(self.rightclick_edge.unwrap());
+                                self.show_edge_color_picker = true;
+
+                                if let Some(edge) = self.map.edges.iter().find(|n| n.id == self.edge_color_picker_id.unwrap()) {
+                                    self.selected_edge_color = egui::Color32::from_rgba_unmultiplied(edge.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[0],
+                                                                                                     edge.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[1],
+                                                                                                     edge.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[2],
+                                                                                                     edge.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[3]);
+                                } else {
+                                    self.selected_edge_color = egui::Color32::LIGHT_BLUE;
+                                }
+
+                                self.show_edge_context_menu = false;
+                            }
+
+                            ui.separator();
+
+
                             // Option to delete edge
                             if ui.button("Delete Edge").clicked() {
                                 if let Some(edge_id) = self.rightclick_edge {
@@ -1355,32 +1388,81 @@ impl MindMapApp {
         }
     }
 
-    fn show_color_picker(&mut self, ctx: &egui::Context) {
-        if self.show_color_picker {
-            if let Some(node_id) = self.color_picker_id {
+    fn show_node_color_picker(&mut self, ctx: &egui::Context) {
+        if self.show_node_color_picker {
+            if let Some(node_id) = self.node_color_picker_id {
                 egui::Window::new("Change Node Color")
                     .collapsible(false)
                     .show(ctx, |ui| {
                         ui.label("Select a color for this node:");
 
                         // Color editor
-                        let mut color = self.selected_color;
+                        let mut color = self.selected_node_color;
                         if ui.color_edit_button_srgba(&mut color).changed() {
-                            self.selected_color = color;
+                            self.selected_node_color = color;
                         }
 
                         ui.horizontal(|ui| {
                             if ui.button("Apply").clicked() {
                                 if let Some(node) = self.map.nodes.iter_mut().find(|n| n.id == node_id) {
-                                    node.color = Some(self.selected_color.to_array());
+                                    node.color = Some(self.selected_node_color.to_array());
                                     self.dirty = true;
                                 }
-                                self.show_color_picker = false;
-                                self.color_picker_id = None;
+                                self.show_node_color_picker = false;
+                                self.node_color_picker_id = None;
+                            }
+                            if ui.button("Reset").clicked() {
+                                if let Some(node) = self.map.nodes.iter_mut().find(|e| e.id == node_id) {
+                                    node.color = None;
+                                    self.dirty = true;
+                                }
+                                self.show_node_color_picker = false;
+                                self.edge_color_picker_id = None;
                             }
                             if ui.button("Cancel").clicked() {
-                                self.show_color_picker = false;
-                                self.color_picker_id = None;
+                                self.show_node_color_picker = false;
+                                self.node_color_picker_id = None;
+                            }
+                        });
+                    });
+            }
+        }
+    }
+
+    fn show_edge_color_picker(&mut self, ctx: &egui::Context) {
+        if self.show_edge_color_picker {
+            if let Some(edge_id) = self.edge_color_picker_id {
+                egui::Window::new("Change Edge Color")
+                    .collapsible(false)
+                    .show(ctx, |ui| {
+                        ui.label("Select a color for this edge:");
+
+                        // Color editor
+                        let mut color = self.selected_edge_color;
+                        if ui.color_edit_button_srgba(&mut color).changed() {
+                            self.selected_edge_color = color;
+                        }
+
+                        ui.horizontal(|ui| {
+                            if ui.button("Apply").clicked() {
+                                if let Some(edge) = self.map.edges.iter_mut().find(|n| n.id == edge_id) {
+                                    edge.color = Some(self.selected_edge_color.to_array());
+                                    self.dirty = true;
+                                }
+                                self.show_edge_color_picker = false;
+                                self.edge_color_picker_id = None;
+                            }
+                            if ui.button("Reset").clicked() {
+                                if let Some(edge) = self.map.edges.iter_mut().find(|e| e.id == edge_id) {
+                                    edge.color = None;
+                                    self.dirty = true;
+                                }
+                                self.show_edge_color_picker = false;
+                                self.edge_color_picker_id = None;
+                            }
+                            if ui.button("Cancel").clicked() {
+                                self.show_edge_color_picker = false;
+                                self.edge_color_picker_id = None;
                             }
                         });
                     });
@@ -1506,9 +1588,12 @@ impl Default for MindMapApp {
             edge_context_menu_pos: egui::pos2(0.0, 0.0),
             show_create_project_prompt: false,
             pending_pdf_path: None,
-            show_color_picker: false,
-            color_picker_id: None,
-            selected_color: egui::Color32::WHITE,
+            show_node_color_picker: false,
+            node_color_picker_id: None,
+            selected_node_color: egui::Color32::WHITE,
+            show_edge_color_picker: false,
+            edge_color_picker_id: None,
+            selected_edge_color: egui::Color32::WHITE,
         };
         // Load last file if it exists
         if let Ok(last_file) = load_last_file() {
@@ -1554,8 +1639,11 @@ impl eframe::App for MindMapApp {
         // Show create project prompt if needed
         self.show_crate_project_promt(ctx);
 
-        // Show color picker if active
-        self.show_color_picker(ctx);
+        // Show node color picker if active
+        self.show_node_color_picker(ctx);
+
+        // Show edge color picker if active
+        self.show_edge_color_picker(ctx);
 
         // main panel
         self.main_view(ctx);

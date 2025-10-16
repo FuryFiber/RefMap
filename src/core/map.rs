@@ -23,6 +23,7 @@ pub struct Node {
      pub to: Uuid,
      pub edge_type: EdgeType,
      pub annotations: Vec<Annotation>,
+     pub color: Option<[u8; 4]>,
  }
 
 // In /src/core/map.rs
@@ -52,7 +53,7 @@ pub enum EdgeType {
              collapsed: true,
              path: None,
              annotations: Vec::new(),
-             color: Some(egui::Color32::LIGHT_BLUE.to_array()),
+             color: None,
          });
          id
      }
@@ -75,7 +76,7 @@ pub enum EdgeType {
                  collapsed: true,
                  path: Some(filename.to_string()),
                  annotations: Vec::new(),
-                 color: Some(egui::Color32::LIGHT_BLUE.to_array()),
+                 color: None,
              };
 
              let id = node.id;
@@ -87,7 +88,7 @@ pub enum EdgeType {
 
      pub fn add_edge(&mut self, from: Uuid, to: Uuid) -> Uuid {
          let id = Uuid::new_v4();
-         self.edges.push(Edge { id, from, to, edge_type: Default::default(), annotations: Vec::new() });
+         self.edges.push(Edge { id, from, to, edge_type: Default::default(), annotations: Vec::new(), color: None });
          id
      }
 
