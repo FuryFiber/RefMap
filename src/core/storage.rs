@@ -1,8 +1,12 @@
 use crate::core::map::MindMap;
 use std::{fs, io};
-use std::io::Read;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::Path;
 use anyhow::{Error, Result};
 use toml::Value;
+use zip::write::{ExtendedFileOptions, FileOptions};
+use zip::ZipWriter;
 
 pub fn save_map(map: &MindMap, path: &str) -> Result<()> {
     let project_dir = std::path::Path::new(path);
@@ -94,5 +98,35 @@ pub fn save_last_file(path: &str) -> Result<(), Error> {
 
     let encoded = toml::to_string(&config)?;
     fs::write(&config_path, encoded)?;
+    Ok(())
+}
+
+pub fn export_project(project_dir: &str, zip_path: &str) -> Result<()> {
+    let project_path = Path::new(project_dir);
+    if !project_path.exists() {
+        return Err(anyhow::Error::msg("Project directory does not exist"));
+    }
+
+    let file = File::create(zip_path)?;
+    let mut zip = ZipWriter::new(file);
+    let options: FileOptions<ExtendedFileOptions> = FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+
+    // Recursively walk through the project directory
+    for entry in walkdir::WalkDir::new(project_path).into_iter().filter_map(|e| e.ok()) {
+        let path = entry.path();
+        let name = path.strip_prefix(project_path)?.to_str().unwrap();
+
+        if path.is_dir() {
+            zip.add_directory(name, options.clone())?;
+        } else {
+            let mut file = File::open(path)?;
+            let mut buffer = Vec::new();
+            file.read_to_end(&mut buffer)?;
+            zip.start_file(name, options.clone())?;
+            zip.write_all(&buffer)?;
+        }
+    }
+
+    zip.finish()?;
     Ok(())
 }

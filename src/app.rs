@@ -3,7 +3,7 @@ use rfd::FileDialog;
 use uuid::Uuid;
 use crate::core::map::{EdgeType, Node};
 use crate::core::MindMap;
-use crate::core::storage::{load_last_file, load_map, save_last_file, save_map};
+use crate::core::storage::{export_project, load_last_file, load_map, save_last_file, save_map};
 use crate::core::pdfparser::Metadata;
 
 
@@ -729,6 +729,22 @@ impl MindMapApp {
 
                     if ui.button("Save As...").clicked() {
                         self.save();
+                        ui.close_kind(UiKind::Menu);
+                    }
+
+                    if ui.button("Export Project...").clicked() {
+                        if let Some(project_dir) = &self.current_file {
+                            if let Some(zip_path) = FileDialog::new()
+                                .add_filter("ZIP", &["zip"])
+                                .save_file()
+                            {
+                                if let Err(e) = export_project(project_dir, zip_path.to_str().unwrap()) {
+                                    eprintln!("Failed to export project: {}", e);
+                                }
+                            }
+                        } else {
+                            eprintln!("No project is currently open.");
+                        }
                         ui.close_kind(UiKind::Menu);
                     }
                 });
