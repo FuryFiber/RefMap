@@ -1007,12 +1007,14 @@ impl eframe::App for MindMapApp {
                 // Drag existing node with left mouse
                 if response.dragged_by(egui::PointerButton::Primary) {
                     if ctx.input(|i| i.modifiers.ctrl) {
-                        // start connection from node under cursor
-                        for node in &self.map.nodes {
-                            let node_rect = get_node_rect(ctx, node, self.zoom);
-                            if node_rect.contains(canvas_pos) {
-                                self.connecting_from = Some(node.id);
-                                break;
+                        // Preserve the connecting_from state during drag
+                        if self.connecting_from.is_none() {
+                            for node in &self.map.nodes {
+                                let node_rect = get_node_rect(ctx, node, self.zoom);
+                                if node_rect.contains(canvas_pos) {
+                                    self.connecting_from = Some(node.id);
+                                    break;
+                                }
                             }
                         }
                     }else {
