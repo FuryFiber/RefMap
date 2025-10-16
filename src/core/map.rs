@@ -4,16 +4,17 @@ use serde::{Serialize, Deserialize};
 use crate::app::Annotation;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
- pub struct Node {
-     pub id: Uuid,
-     pub title: String,
-     pub metadata: Option<Metadata>,
-     pub x: f32,
-     pub y: f32,
-     pub collapsed: bool,
-     pub path: Option<String>,
-     pub annotations: Vec<Annotation>,
- }
+pub struct Node {
+    pub id: Uuid,
+    pub title: String,
+    pub metadata: Option<Metadata>,
+    pub x: f32,
+    pub y: f32,
+    pub collapsed: bool,
+    pub path: Option<String>,
+    pub annotations: Vec<Annotation>,
+    pub color: Option<[u8; 4]>,
+}
 
  #[derive(Debug, Clone, Serialize, Deserialize)]
  pub struct Edge {
@@ -50,7 +51,8 @@ pub enum EdgeType {
              y,
              collapsed: true,
              path: None,
-             annotations: Vec::new()
+             annotations: Vec::new(),
+             color: Some(egui::Color32::LIGHT_BLUE.to_array()),
          });
          id
      }
@@ -72,7 +74,8 @@ pub enum EdgeType {
                  metadata: Some(metadata),
                  collapsed: true,
                  path: Some(filename.to_string()),
-                 annotations: Vec::new()
+                 annotations: Vec::new(),
+                 color: Some(egui::Color32::LIGHT_BLUE.to_array()),
              };
 
              let id = node.id;

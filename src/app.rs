@@ -59,8 +59,14 @@ pub struct MindMapApp {
     show_edge_context_menu: bool,       // Whether to show the edge context menu
     edge_context_menu_pos: Pos2,        // Position to show the edge context menu
 
+    // Project creation prompt state
     show_create_project_prompt: bool,   // Whether to show the prompt
     pending_pdf_path: Option<String>,   // PDF path to add after project creation
+
+    // Color picker state
+    show_color_picker: bool,            // Whether to show color picker
+    color_picker_id: Option<Uuid>,      // Node ID for which color picker is shown
+    selected_color: egui::Color32,      // Currently selected color
 }
 
 // Helper struct for editing metadata
@@ -634,10 +640,14 @@ impl MindMapApp {
                 let node_rect = egui::Rect::from_center_size(pos, node_size);
 
                 // Draw node background
-                let fill = if self.selected_nodes.contains(&node.id) {
-                    egui::Color32::from_rgb(180, 220, 255)
+                let fill = if let Some(color) = node.color {
+                    color
                 } else {
-                    egui::Color32::LIGHT_BLUE
+                    if self.selected_nodes.contains(&node.id) {
+                        egui::Color32::from_rgb(180, 220, 255).to_array()
+                    } else {
+                        egui::Color32::LIGHT_BLUE.to_array()
+                    }
                 };
                 let stroke = if self.selected_nodes.contains(&node.id) {
                     egui::Stroke::new(3.0, egui::Color32::from_rgb(0, 100, 255))
@@ -645,7 +655,7 @@ impl MindMapApp {
                     egui::Stroke::new(1.0, egui::Color32::BLACK)
                 };
 
-                painter.rect(node_rect, 5.0, fill, stroke, egui::StrokeKind::Middle);
+                painter.rect(node_rect, 5.0, egui::Color32::from_rgba_unmultiplied(fill[0], fill[1], fill[2], fill[3]), stroke, egui::StrokeKind::Middle);
 
                 // Draw annotation icon if node has annotations
                 if !node.annotations.is_empty(){
@@ -783,6 +793,12 @@ impl MindMapApp {
                                     self.edit_annotation = EditableAnnotation::default();
                                     self.show_add_annotation_dialog = true;
                                 }
+                                self.show_node_context_menu = false;
+                            }
+
+                            if ui.button("Change Color").clicked() {
+                                self.color_picker_id = Some(self.rightclick_node.unwrap());
+                                self.show_color_picker = true;
                                 self.show_node_context_menu = false;
                             }
 
@@ -1339,6 +1355,39 @@ impl MindMapApp {
         }
     }
 
+    fn show_color_picker(&mut self, ctx: &egui::Context) {
+        if self.show_color_picker {
+            if let Some(node_id) = self.color_picker_id {
+                egui::Window::new("Change Node Color")
+                    .collapsible(false)
+                    .show(ctx, |ui| {
+                        ui.label("Select a color for this node:");
+
+                        // Color editor
+                        let mut color = self.selected_color;
+                        if ui.color_edit_button_srgba(&mut color).changed() {
+                            self.selected_color = color;
+                        }
+
+                        ui.horizontal(|ui| {
+                            if ui.button("Apply").clicked() {
+                                if let Some(node) = self.map.nodes.iter_mut().find(|n| n.id == node_id) {
+                                    node.color = Some(self.selected_color.to_array());
+                                    self.dirty = true;
+                                }
+                                self.show_color_picker = false;
+                                self.color_picker_id = None;
+                            }
+                            if ui.button("Cancel").clicked() {
+                                self.show_color_picker = false;
+                                self.color_picker_id = None;
+                            }
+                        });
+                    });
+            }
+        }
+    }
+
     fn save(&mut self) {
         if let Some(project_dir) = FileDialog::new().pick_folder() {
             self.current_file = Some(project_dir.to_str().unwrap().to_string());
@@ -1457,6 +1506,9 @@ impl Default for MindMapApp {
             edge_context_menu_pos: egui::pos2(0.0, 0.0),
             show_create_project_prompt: false,
             pending_pdf_path: None,
+            show_color_picker: false,
+            color_picker_id: None,
+            selected_color: egui::Color32::WHITE,
         };
         // Load last file if it exists
         if let Ok(last_file) = load_last_file() {
@@ -1501,6 +1553,9 @@ impl eframe::App for MindMapApp {
 
         // Show create project prompt if needed
         self.show_crate_project_promt(ctx);
+
+        // Show color picker if active
+        self.show_color_picker(ctx);
 
         // main panel
         self.main_view(ctx);
