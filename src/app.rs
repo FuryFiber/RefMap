@@ -924,6 +924,12 @@ impl MindMapApp {
                                 }
                                 self.show_edge_context_menu = false;
                             }
+                            
+                            // Option to view annotations
+                            if ui.button("View Annotations").clicked() {
+                                self.show_annotations_panel = true;
+                                self.show_edge_context_menu = false;
+                            }
 
                             // Option to add annotation
                             if ui.button("Add Annotation").clicked() {
@@ -932,12 +938,6 @@ impl MindMapApp {
                                     self.show_add_annotation_dialog = true;
                                     self.rightclick_edge = Some(edge_id);
                                 }
-                                self.show_edge_context_menu = false;
-                            }
-
-                            // Option to view annotations
-                            if ui.button("View Annotations").clicked() {
-                                self.show_annotations_panel = true;
                                 self.show_edge_context_menu = false;
                             }
 

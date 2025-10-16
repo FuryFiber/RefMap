@@ -56,14 +56,16 @@ It allows users to create a visual overview of the documentation that was gather
     - **Edit Metadata**: Modify the node's title, authors, keywords, and date.
     - **View Annotations**: Open the annotations panel for this node.
     - **Add Annotation**: Create a new annotation for this node.
+    - **Change Color**: Change the node's color
     - **Delete Node**: Remove the selected node.
 
 ---
 ## Editing Edges
 - **Right-click** on an edge to open the context menu:
   - **Change Edge Type**: Modify the edge's type.
-  - **Add Annotation**: Create a new annotation for this edge.
   - **View Annotations**: Open the annotations panel for this edge.
+  - **Add Annotation**: Create a new annotation for this edge.
+  - **Change Color**: Change the edge's color
   - **Delete Node**: Remove the selected edge.
 ---
 
