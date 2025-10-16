@@ -180,7 +180,7 @@ impl MindMapApp {
     }
 
     fn handle_navigation(&mut self, ctx: &egui::Context, response: &egui::Response, rect: egui::Rect) {
-        if response.dragged_by(egui::PointerButton::Middle) {
+        if response.dragged_by(egui::PointerButton::Middle) || (response.dragged_by(egui::PointerButton::Primary) && ctx.input(|s|s.modifiers.shift)) {
             self.pan += response.drag_delta();
         }
 
@@ -264,7 +264,7 @@ impl MindMapApp {
     fn handle_right_drag(&mut self, ctx: &egui::Context, response: &egui::Response, canvas_pos: Pos2){
         if response.drag_started_by(egui::PointerButton::Secondary) {
             // start connection from node under cursor
-            self.start_edge(ctx, canvas_pos);
+            self.start_edge(ctx, canvas_pos)
         }
 
         if response.drag_stopped_by(egui::PointerButton::Secondary) {
@@ -323,7 +323,7 @@ impl MindMapApp {
     }
 
     fn handle_left_drag(&mut self, ctx: &egui::Context, response: &egui::Response, canvas_pos: Pos2) {
-        if response.dragged_by(egui::PointerButton::Primary) {
+        if response.dragged_by(egui::PointerButton::Primary) && !ctx.input(|s| s.modifiers.shift) {
             if ctx.input(|i| i.modifiers.ctrl) {
                 // Preserve the connecting_from state during drag
                 if self.connecting_from.is_none() {
@@ -1430,7 +1430,7 @@ impl MindMapApp {
         }
     }
 
-    fn show_crate_project_promt(&mut self, ctx: &egui::Context) {
+    fn show_create_project_promt(&mut self, ctx: &egui::Context) {
         if self.show_create_project_prompt {
             egui::Window::new("Create Project First")
                 .collapsible(false)
@@ -1696,7 +1696,7 @@ impl eframe::App for MindMapApp {
         self.show_edge_type_menu(ctx);
 
         // Show create project prompt if needed
-        self.show_crate_project_promt(ctx);
+        self.show_create_project_promt(ctx);
 
         // Show node color picker if active
         self.show_node_color_picker(ctx);
