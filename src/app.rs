@@ -1478,7 +1478,7 @@ fn get_node_rect(ctx: &egui::Context, node: &Node, zoom: f32) -> egui::Rect {
     egui::Rect::from_center_size(egui::pos2(node.x, node.y), node_size)
 }
 
-fn point_line_distance(a: egui::Pos2, b: egui::Pos2, p: egui::Pos2) -> f32 {
+fn point_line_distance(a: Pos2, b: Pos2, p: Pos2) -> f32 {
     let ap = p - a;
     let ab = b - a;
     let ab_len = ab.length();
