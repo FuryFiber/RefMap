@@ -30,7 +30,7 @@ It allows users to create a visual overview of the documentation that was gather
 ---
 
 ## Creating a New Mind Map
-- **Menu**: `File → New` to start a blank mind map.
+- **Menu**: `File → New` to start a new project.
 - **Initial State**: The canvas is empty. Double click anywhere to add your first node.
 
 ---
@@ -118,11 +118,14 @@ Annotations are color-coded notes attached to specific nodes. Each annotation ty
 
 ## Saving and Loading
 ### Save
-- **Ctrl + S**: Save the current map. If no file is set, a dialog will prompt for a location.
-- **File → Save As...**: Choose a location to save the `.json` file.
+- **Ctrl + S**: Save the current map. If no project is set, a dialog will prompt for a location.
+- **File → Save As...**: Choose a location to save the project file.
 
 ### Load
-- **File → Open...**: Select an existing `.json` mind map file.
+- **File → Open...**: Select an existing project to open.
+
+### Export
+- **File → Export**: Export the current project as a zip archive containing the map data and associated PDFs.
 
 ---
 
