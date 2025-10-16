@@ -1,7 +1,7 @@
 use egui::{Id, UiKind};
 use rfd::FileDialog;
 use uuid::Uuid;
-use crate::core::map::Node;
+use crate::core::map::{EdgeType, Node};
 use crate::core::MindMap;
 use crate::core::storage::{load_map, save_map};
 use crate::core::pdfparser::Metadata;
@@ -29,9 +29,9 @@ pub struct MindMapApp {
     last_save: std::time::Instant,      // last save time for autosave
     dirty: bool,                        // whether there are unsaved changes
 
-    // Right-click context menu state
+    // Right-click context for nodes
     rightclick_node: Option<Uuid>,      // node that was right-clicked
-    show_context_menu: bool,            // whether context menu should be visible
+    show_node_context_menu: bool,            // whether context menu should be visible
     context_menu_pos: egui::Pos2,       // position to show context menu
 
     // Metadata editing state
@@ -40,12 +40,24 @@ pub struct MindMapApp {
     edit_metadata: EditableMetadata,    // editable metadata fields
 
     // Annotation state
-    show_annotations_panel: bool,
-    show_add_annotation_dialog: bool,
-    show_edit_annotation_dialog: bool,
-    edit_annotation_id: Option<Uuid>,
-    edit_annotation: EditableAnnotation,
-    annotations_node_id: Option<Uuid>,
+    show_annotations_panel: bool,       // whether to show annotations panel
+    show_add_annotation_dialog: bool,   // whether to show add annotation dialog
+    show_edit_annotation_dialog: bool,  // whether to show edit annotation dialog
+    edit_annotation_id: Option<Uuid>,   // annotation currently being edited
+    edit_annotation: EditableAnnotation,// editable annotation fields
+    annotations_node_id: Option<Uuid>,  // node whose annotations are being viewed/edited
+
+    // Edge creation state
+    pending_edge_from: Option<Uuid>,    // node where edge creation started
+    pending_edge_to: Option<Uuid>,      // node where edge creation ends
+    show_edge_type_menu: bool,          // whether to show edge type selection menu
+    selected_edge_type: EdgeType,       // selected edge type for new edge
+    edge_type_menu_pos: Option<egui::Pos2>, // position to show edge type menu
+
+    // Right-click context for edges
+    rightclick_edge: Option<Uuid>,      // Edge that was right-clicked
+    show_edge_context_menu: bool,      // Whether to show the edge context menu
+    edge_context_menu_pos: egui::Pos2, // Position to show the edge context menu
 }
 
 // Helper struct for editing metadata
@@ -154,8 +166,8 @@ impl MindMapApp {
         });
     }
 
-    fn show_context_menu(&mut self, ctx: &egui::Context) {
-        if self.show_context_menu {
+    fn show_node_context_menu(&mut self, ctx: &egui::Context) {
+        if self.show_node_context_menu {
             let menu_rect = egui::Rect::from_min_size(self.context_menu_pos, egui::vec2(150.0, 100.0));
 
             egui::Area::new(Id::from("context_menu"))
@@ -168,7 +180,7 @@ impl MindMapApp {
 
                             if ui.button("Edit Metadata").clicked() {
                                 self.start_editing();
-                                self.show_context_menu = false;
+                                self.show_node_context_menu = false;
                             }
 
                             if ui.button("View Annotations").clicked() {
@@ -176,7 +188,7 @@ impl MindMapApp {
                                     self.annotations_node_id = Some(node_id);
                                     self.show_annotations_panel = true;
                                 }
-                                self.show_context_menu = false;
+                                self.show_node_context_menu = false;
                             }
 
                             if ui.button("Add Annotation").clicked() {
@@ -185,7 +197,7 @@ impl MindMapApp {
                                     self.edit_annotation = EditableAnnotation::default();
                                     self.show_add_annotation_dialog = true;
                                 }
-                                self.show_context_menu = false;
+                                self.show_node_context_menu = false;
                             }
 
                             ui.separator();
@@ -195,7 +207,7 @@ impl MindMapApp {
                                     self.map.remove_node(node_id);
                                     self.dirty = true;
                                 }
-                                self.show_context_menu = false;
+                                self.show_node_context_menu = false;
                             }
                         });
                 });
@@ -204,7 +216,7 @@ impl MindMapApp {
             if ctx.input(|i| i.pointer.any_click()) {
                 if let Some(pointer_pos) = ctx.input(|i| i.pointer.interact_pos()) {
                     if !menu_rect.contains(pointer_pos) {
-                        self.show_context_menu = false;
+                        self.show_node_context_menu = false;
                     }
                 }
             }
@@ -258,6 +270,53 @@ impl MindMapApp {
                             });
                         } else {
                             ui.label("Node not found");
+                        }
+                    });
+            }
+            if let Some(edge_id) = self.rightclick_edge {
+                egui::Window::new("Annotations")
+                    .collapsible(false)
+                    .resizable(true)
+                    .default_width(400.0)
+                    .default_height(600.0)
+                    .show(ctx, |ui| {
+                        // Find the edge and clone the annotations
+                        let edge_data = self.map.edges.iter()
+                            .find(|e| e.id == edge_id)
+                            .map(|e| e.annotations.clone());
+
+                        if let Some(annotations) = edge_data {
+                            ui.heading("Annotations for Edge");
+                            ui.separator();
+
+                            // Add new annotation button
+                            if ui.button("➕ Add New Annotation").clicked() {
+                                self.edit_annotation = EditableAnnotation::default();
+                                self.show_add_annotation_dialog = true;
+                            }
+
+                            ui.separator();
+
+                            // Show existing annotations
+                            egui::ScrollArea::vertical().show(ui, |ui| {
+                                for annotation in &annotations {
+                                    self.show_annotation_card(ui, annotation, edge_id);
+                                    ui.separator();
+                                }
+
+                                if annotations.is_empty() {
+                                    ui.label("No annotations yet. Click 'Add New Annotation' to get started!");
+                                }
+                            });
+
+                            ui.horizontal(|ui| {
+                                if ui.button("Close").clicked() {
+                                    self.show_annotations_panel = false;
+                                    self.rightclick_edge = None;
+                                }
+                            });
+                        } else {
+                            ui.label("Edge not found");
                         }
                     });
             }
@@ -423,6 +482,29 @@ impl MindMapApp {
                 self.dirty = true;
             }
         }
+
+        if let Some(edge_id) = self.rightclick_edge {
+            if let Some(edge) = self.map.edges.iter_mut().find(|e| e.id == edge_id) {
+                let page_number = if self.edit_annotation.page_number.trim().is_empty() {
+                    None
+                } else {
+                    self.edit_annotation.page_number.parse().ok()
+                };
+
+                let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
+
+                let annotation = Annotation {
+                    id: Uuid::new_v4(),
+                    annotation_type: self.edit_annotation.annotation_type.clone(),
+                    title: self.edit_annotation.title.clone(),
+                    content: self.edit_annotation.content.clone(),
+                    created_at: now,
+                    page_number,
+                };
+                edge.annotations.push(annotation);
+                self.dirty = true;
+            }
+        }
     }
 
     fn start_editing(&mut self) {
@@ -534,7 +616,77 @@ impl MindMapApp {
         self.edit_node_id = None;
     }
 
+    fn finalize_edge(&mut self) {
+        if let (Some(from), Some(to)) = (self.pending_edge_from, self.pending_edge_to) {
+            self.map.add_edge(from, to);
+            self.map.edges.last_mut().unwrap().edge_type = self.selected_edge_type.clone();
+            self.dirty = true;
+        }
+        self.show_edge_type_menu = false;
+        self.pending_edge_from = None;
+        self.pending_edge_to = None;
+    }
 
+    fn show_edge_context_menu(&mut self, ctx: &egui::Context) {
+        if self.show_edge_context_menu {
+            let menu_rect = egui::Rect::from_min_size(self.edge_context_menu_pos, egui::vec2(150.0, 100.0));
+
+            egui::Area::new(Id::from("edge_context_menu"))
+                .fixed_pos(self.edge_context_menu_pos)
+                .order(egui::Order::Tooltip)
+                .show(ctx, |ui| {
+                    egui::Frame::popup(ui.style())
+                        .show(ui, |ui| {
+                            ui.set_min_width(150.0);
+
+                            // Option to change edge type
+                            if ui.button("Change Edge Type").clicked() {
+                                if let Some(edge_id) = self.rightclick_edge {
+                                    if let Some(edge) = self.map.edges.iter_mut().find(|e| e.id == edge_id) {
+                                        self.selected_edge_type = edge.edge_type.clone();
+                                        self.show_edge_type_menu = true;
+                                    }
+                                }
+                                self.show_edge_context_menu = false;
+                            }
+
+                            // Option to add annotation
+                            if ui.button("Add Annotation").clicked() {
+                                if let Some(edge_id) = self.rightclick_edge {
+                                    self.edit_annotation = EditableAnnotation::default();
+                                    self.show_add_annotation_dialog = true;
+                                    self.rightclick_edge = Some(edge_id);
+                                }
+                                self.show_edge_context_menu = false;
+                            }
+
+                            // Option to view annotations
+                            if ui.button("View Annotations").clicked() {
+                                self.show_annotations_panel = true;
+                                self.show_edge_context_menu = false;
+                            }
+
+                            // Option to delete edge
+                            if ui.button("Delete Edge").clicked() {
+                                if let Some(edge_id) = self.rightclick_edge {
+                                    self.map.edges.retain(|e| e.id != edge_id);
+                                    self.dirty = true;
+                                }
+                                self.show_edge_context_menu = false;
+                            }
+                        });
+                });
+
+            // Close menu if clicked elsewhere
+            if ctx.input(|i| i.pointer.any_click()) {
+                if let Some(pointer_pos) = ctx.input(|i| i.pointer.interact_pos()) {
+                    if !menu_rect.contains(pointer_pos) {
+                        self.show_edge_context_menu = false;
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl Default for MindMapApp {
@@ -555,7 +707,7 @@ impl Default for MindMapApp {
             dirty: false,
             rightclick_node: None,
             // Initialize new fields
-            show_context_menu: false,
+            show_node_context_menu: false,
             context_menu_pos: egui::pos2(0.0, 0.0),
             show_edit_dialog: false,
             edit_node_id: None,
@@ -566,6 +718,14 @@ impl Default for MindMapApp {
             edit_annotation_id: None,
             edit_annotation: EditableAnnotation::default(),
             annotations_node_id: None,
+            pending_edge_from: None,
+            pending_edge_to: None,
+            show_edge_type_menu: false,
+            selected_edge_type: EdgeType::Normal,
+            edge_type_menu_pos: None,
+            rightclick_edge: None,
+            show_edge_context_menu: false,
+            edge_context_menu_pos: egui::pos2(0.0, 0.0),
         }
     }
 }
@@ -585,7 +745,7 @@ impl eframe::App for MindMapApp {
         self.menu_bar(ctx);
 
         // Show context menu if active
-        self.show_context_menu(ctx);
+        self.show_node_context_menu(ctx);
 
         // Show edit dialog if active
         self.show_edit_dialog(ctx);
@@ -593,6 +753,57 @@ impl eframe::App for MindMapApp {
         // Show annotation dialogs
         self.show_annotations_panel(ctx);
         self.show_annotation_dialog(ctx);
+
+        // Show edge context menu if active
+        self.show_edge_context_menu(ctx);
+
+        // Edge type selection menu
+        if self.show_edge_type_menu {
+            if let Some(menu_pos) = self.edge_type_menu_pos {
+                egui::Window::new("Select Edge Type")
+                    .collapsible(false)
+                    .resizable(false)
+                    .fixed_pos(menu_pos) // Use the stored position
+                    .show(ctx, |ui| {
+                        ui.label("Select edge type:");
+
+                        if ui.button("Normal").clicked() {
+                            self.selected_edge_type = EdgeType::Normal;
+                            if let Some(edge_id) = self.rightclick_edge {
+                                if let Some(edge) = self.map.edges.iter_mut().find(|e| e.id == edge_id) {
+                                    edge.edge_type = self.selected_edge_type.clone();
+                                    self.dirty = true;
+                                    self.rightclick_edge = None;
+                                }
+                            } else {
+                                self.finalize_edge();
+                            }
+                            self.show_edge_type_menu = false;
+                        }
+
+                        if ui.button("References").clicked() {
+                            self.selected_edge_type = EdgeType::References;
+                            if let Some(edge_id) = self.rightclick_edge {
+                                if let Some(edge) = self.map.edges.iter_mut().find(|e| e.id == edge_id) {
+                                    edge.edge_type = self.selected_edge_type.clone();
+                                    self.dirty = true;
+                                    self.rightclick_edge = None;
+                                }
+                            } else {
+                                self.finalize_edge();
+                            }
+                            self.show_edge_type_menu = false;
+                        }
+
+                        if ui.button("Cancel").clicked() {
+                            self.show_edge_type_menu = false;
+                            self.pending_edge_from = None;
+                            self.pending_edge_to = None;
+                            self.edge_type_menu_pos = None; // Reset the position
+                        }
+                    });
+            }
+        }
 
         // main panel
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -668,7 +879,7 @@ impl eframe::App for MindMapApp {
                 // Left click selection / creation
                 if response.clicked_by(egui::PointerButton::Primary) {
                     // hide context menu on any left click
-                    self.show_context_menu = false;
+                    self.show_node_context_menu = false;
 
                     let mut clicked_any = false;
 
@@ -847,15 +1058,39 @@ impl eframe::App for MindMapApp {
                             // Show context menu for this node
                             self.rightclick_node = Some(node.id);
                             self.context_menu_pos = pointer_pos;
-                            self.show_context_menu = true;
+                            self.show_node_context_menu = true;
                             clicked_any = true;
                             break;
                         }
                     }
 
+                    if !clicked_any {
+                        // Check if clicked on an edge
+                        for edge in &self.map.edges {
+                            let from = self.map.nodes.iter().find(|n| n.id == edge.from);
+                            let to = self.map.nodes.iter().find(|n| n.id == edge.to);
+                            if let (Some(f), Some(t)) = (from, to) {
+                                let dist = point_line_distance(
+                                    egui::pos2(f.x, f.y),
+                                    egui::pos2(t.x, t.y),
+                                    canvas_pos,
+                                );
+                                if dist < 8.0 {
+                                    // Right-clicked on an edge
+                                    self.rightclick_edge = Some(edge.id);
+                                    self.edge_context_menu_pos = pointer_pos;
+                                    self.show_edge_context_menu = true;
+                                    clicked_any = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
                     // If didn't click on anything, close context menu
                     if !clicked_any {
-                        self.show_context_menu = false;
+                        self.show_node_context_menu = false;
+                        self.show_edge_context_menu = false;
                     }
                 }
 
@@ -873,14 +1108,20 @@ impl eframe::App for MindMapApp {
 
                 if response.drag_stopped_by(egui::PointerButton::Secondary) {
                     if let Some(start_id) = self.connecting_from.take() {
-                        // released — check if over another node
+                        let mut found_to_id = None;
                         for node in &self.map.nodes {
                             let node_rect = get_node_rect(ctx, node, self.zoom);
                             if node_rect.contains(canvas_pos) && node.id != start_id {
-                                self.map.add_edge(start_id, node.id);
-                                self.dirty = true;
+                                found_to_id = Some(node.id);
                                 break;
                             }
+                        }
+
+                        if let Some(to_id) = found_to_id {
+                            self.pending_edge_from = Some(start_id);
+                            self.pending_edge_to = Some(to_id);
+                            self.show_edge_type_menu = true;
+                            self.edge_type_menu_pos = ctx.input(|i| i.pointer.hover_pos());
                         }
                     }
                 }
@@ -899,7 +1140,41 @@ impl eframe::App for MindMapApp {
                         egui::Color32::DARK_GRAY
                     };
                     let width = 2.0;
+
+                    // Draw line
                     painter.line_segment([p1, p2], egui::Stroke::new(width, color));
+
+                    // Draw arrowhead for References
+                    if edge.edge_type == EdgeType::References {
+                        let arrow_size = 15.0; // Size of the arrowhead
+                        let angle = std::f32::consts::PI / 6.0; // 30 degrees
+                        let dir = (p2 - p1).normalized(); // Direction of the edge
+                        let perp = egui::Vec2::new(-dir.y, dir.x); // Perpendicular vector
+
+                        // Calculate the midpoint of the edge
+                        let midpoint = (p1 + p2.to_vec2()) * 0.5;
+
+                        // Calculate the arrowhead points
+                        let p1_arrow = midpoint - dir * arrow_size * 0.5; // Base of the arrowhead
+                        let p2_arrow = midpoint + dir * arrow_size * 0.5; // Tip of the arrowhead
+                        let p3_arrow = p1_arrow + perp * arrow_size * angle.tan(); // One side of the arrowhead
+                        let p4_arrow = p1_arrow - perp * arrow_size * angle.tan(); // Other side of the arrowhead
+
+                        let width = 3.0; // Stroke width
+                        painter.line_segment([p2_arrow, p3_arrow], egui::Stroke::new(width, color)); // Line from tip to one side
+                        painter.line_segment([p2_arrow, p4_arrow], egui::Stroke::new(width, color)); // Line from tip to other side
+                    }
+                }
+            }
+
+            if let (Some(from), Some(to)) = (self.pending_edge_from, self.pending_edge_to) {
+                if let (Some(f), Some(t)) = (
+                    self.map.nodes.iter().find(|n| n.id == from),
+                    self.map.nodes.iter().find(|n| n.id == to),
+                ) {
+                    let p1 = egui::pos2(f.x, f.y) * self.zoom + self.pan + rect.min.to_vec2();
+                    let p2 = egui::pos2(t.x, t.y) * self.zoom + self.pan + rect.min.to_vec2();
+                    painter.line_segment([p1, p2], egui::Stroke::new(1.5, egui::Color32::LIGHT_GRAY));
                 }
             }
 
@@ -1146,3 +1421,4 @@ fn point_line_distance(a: egui::Pos2, b: egui::Pos2, p: egui::Pos2) -> f32 {
     let proj = a + ab * t;
     (p - proj).length()
 }
+

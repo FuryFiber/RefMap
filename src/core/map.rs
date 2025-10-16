@@ -12,7 +12,7 @@ use crate::app::Annotation;
      pub y: f32,
      pub collapsed: bool,
      pub path: Option<String>,
-     pub annotations: Vec<Annotation>, // Add this field
+     pub annotations: Vec<Annotation>,
  }
 
  #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,7 +20,18 @@ use crate::app::Annotation;
      pub id: Uuid,
      pub from: Uuid,
      pub to: Uuid,
+     pub edge_type: EdgeType,
+     pub annotations: Vec<Annotation>,
  }
+
+// In /src/core/map.rs
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub enum EdgeType {
+    #[default]
+    Normal,
+    References,
+}
+
 
  #[derive(Debug, Clone, Serialize, Deserialize, Default)]
  pub struct MindMap {
@@ -38,7 +49,7 @@ use crate::app::Annotation;
              x,
              y,
              collapsed: true,
-             path: None, 
+             path: None,
              annotations: Vec::new()
          });
          id
@@ -73,7 +84,7 @@ use crate::app::Annotation;
 
      pub fn add_edge(&mut self, from: Uuid, to: Uuid) -> Uuid {
          let id = Uuid::new_v4();
-         self.edges.push(Edge { id, from, to });
+         self.edges.push(Edge { id, from, to, edge_type: Default::default(), annotations: Vec::new() });
          id
      }
 
