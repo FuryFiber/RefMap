@@ -3,7 +3,7 @@ use rfd::FileDialog;
 use uuid::Uuid;
 use crate::core::map::{EdgeType, Node};
 use crate::core::MindMap;
-use crate::core::storage::{load_map, save_map};
+use crate::core::storage::{load_last_file, load_map, save_last_file, save_map};
 use crate::core::pdfparser::Metadata;
 
 
@@ -698,6 +698,9 @@ impl MindMapApp {
                         {
                             if let Ok(loaded_map) = load_map(path.to_str().unwrap()) {
                                 self.current_file = Some(path.to_str().unwrap().to_string());
+                                if let Err(e) = save_last_file(&self.current_file.as_ref().unwrap()) {
+                                    eprintln!("Failed to save last file: {}", e);
+                                }
                                 self.map = loaded_map;
                             }
                         }
@@ -1288,6 +1291,9 @@ impl MindMapApp {
             .save_file()
         {
             self.current_file = Some(path.to_str().unwrap().to_string());
+            if let Err(e) = save_last_file(&self.current_file.as_ref().unwrap()) {
+                eprintln!("Failed to save last file: {}", e);
+            }
             let _ = save_map(&self.map, path.to_str().unwrap());
         }
     }
@@ -1347,7 +1353,7 @@ impl MindMapApp {
 impl Default for MindMapApp {
     fn default() -> Self {
         let map = MindMap::default();
-        Self {
+        let mut app = Self {
             map,
             dragging_node: None,
             connecting_from: None,
@@ -1381,7 +1387,15 @@ impl Default for MindMapApp {
             rightclick_edge: None,
             show_edge_context_menu: false,
             edge_context_menu_pos: egui::pos2(0.0, 0.0),
+        };
+        // Load last file if it exists
+        if let Ok(last_file) = load_last_file() {
+            app.current_file = Some(last_file);
+            if let Ok(loaded_map) = load_map(&app.current_file.as_ref().unwrap()) {
+                app.map = loaded_map;
+            }
         }
+        app
     }
 }
 

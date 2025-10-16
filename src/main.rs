@@ -1,10 +1,6 @@
 mod core;
 mod app;
-
 use crate::app::MindMapApp;
-
-
-
 
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions::default();
