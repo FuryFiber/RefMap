@@ -46,7 +46,7 @@ It allows users to create a visual overview of the documentation that was gather
 ---
 
 ## Connecting Nodes
-- **Right-click and drag** from one node to another to create a connection.
+- **Right-click and drag** or **Hold CTRL and drag Left-click** from one node to another to create a connection.
 - Release the mouse button on the target node to complete the connection. At this point a menu will appear to select the edge type
 
 ---
@@ -99,6 +99,7 @@ Annotations are color-coded notes attached to specific nodes. Each annotation ty
 - **Single Select**: Left-click a node.
 - **Multiple Select**:
     - **Marquee Select**: Click and drag to select multiple nodes within a rectangle.
+    - **Shift + Click**: Add node or edge to selection
 
 ### Moving Nodes
 - **Left-click and drag** a selected node to reposition it.

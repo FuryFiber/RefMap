@@ -930,24 +930,34 @@ impl eframe::App for MindMapApp {
                         for node in &self.map.nodes {
                             let node_rect = get_node_rect(ctx, node, self.zoom);
                             if node_rect.contains(canvas_pos) {
-                                self.selected_nodes.push(node.id);
+                                if self.selected_nodes.contains(&node.id){
+                                    self.selected_nodes.retain(|n| *n != node.id)
+                                } else {
+                                    self.selected_nodes.push(node.id);
+                                }
                                 clicked_any = true;
                                 break;
                             }
                         }
-                        for edge in &self.map.edges {
-                            let from = self.map.nodes.iter().find(|n| n.id == edge.from);
-                            let to = self.map.nodes.iter().find(|n| n.id == edge.to);
-                            if let (Some(f), Some(t)) = (from, to) {
-                                let dist = point_line_distance(
-                                    egui::pos2(f.x, f.y),
-                                    egui::pos2(t.x, t.y),
-                                    canvas_pos,
-                                );
-                                if dist < 8.0 {
-                                    self.selected_edges.push(edge.id);
-                                    clicked_any = true;
-                                    break;
+                        if !clicked_any {
+                            for edge in &self.map.edges {
+                                let from = self.map.nodes.iter().find(|n| n.id == edge.from);
+                                let to = self.map.nodes.iter().find(|n| n.id == edge.to);
+                                if let (Some(f), Some(t)) = (from, to) {
+                                    let dist = point_line_distance(
+                                        egui::pos2(f.x, f.y),
+                                        egui::pos2(t.x, t.y),
+                                        canvas_pos,
+                                    );
+                                    if dist < 8.0 {
+                                        if self.selected_edges.contains(&edge.id){
+                                            self.selected_edges.retain(|n| *n != edge.id)
+                                        } else {
+                                            self.selected_edges.push(edge.id);
+                                        }
+                                        clicked_any = true;
+                                        break;
+                                    }
                                 }
                             }
                         }
