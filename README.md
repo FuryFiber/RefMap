@@ -47,7 +47,7 @@ It allows users to create a visual overview of the documentation that was gather
 
 ## Connecting Nodes
 - **Right-click and drag** from one node to another to create a connection.
-- Release the mouse button on the target node to complete the connection.
+- Release the mouse button on the target node to complete the connection. At this point a menu will appear to select the edge type
 
 ---
 
@@ -58,6 +58,13 @@ It allows users to create a visual overview of the documentation that was gather
     - **Add Annotation**: Create a new annotation for this node.
     - **Delete Node**: Remove the selected node.
 
+---
+## Editing Edges
+- **Right-click** on an edge to open the context menu:
+  - **Change Edge Type**: Modify the edge's type.
+  - **Add Annotation**: Create a new annotation for this edge.
+  - **View Annotations**: Open the annotations panel for this edge.
+  - **Delete Node**: Remove the selected edge.
 ---
 
 ## Annotations
