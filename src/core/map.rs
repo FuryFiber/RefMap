@@ -14,6 +14,7 @@ pub struct Node {
     pub path: Option<String>,
     pub annotations: Vec<Annotation>,
     pub color: Option<[u8; 4]>,
+    pub tags: Vec<Tag>,
 }
 
  #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,13 +27,20 @@ pub struct Node {
      pub color: Option<[u8; 4]>,
  }
 
-// In /src/core/map.rs
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum EdgeType {
     #[default]
     Normal,
     References,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct Tag {
+    pub name: String,
+    pub color: [u8; 4],
+    pub id: Uuid,
+}
+
 
 
  #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -54,6 +62,7 @@ pub enum EdgeType {
              path: None,
              annotations: Vec::new(),
              color: None,
+             tags: Vec::new(),
          });
          id
      }
@@ -77,6 +86,7 @@ pub enum EdgeType {
                  path: Some(filename.to_string()),
                  annotations: Vec::new(),
                  color: None,
+                 tags: Vec::new(),
              };
 
              let id = node.id;

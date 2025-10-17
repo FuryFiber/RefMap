@@ -1,14 +1,16 @@
-use egui::{Id, Pos2, UiKind};
+use egui::{Id, Margin, Pos2, UiKind};
 use rfd::FileDialog;
 use uuid::Uuid;
-use crate::core::map::{EdgeType, Node};
+use crate::core::map::{EdgeType, Node, Tag};
 use crate::core::MindMap;
-use crate::core::storage::{export_project, load_last_file, load_map, save_last_file, save_map};
+use crate::core::storage::{export_project, get_theme, load_last_file, load_map, save_last_file, save_map};
 use crate::core::pdfparser::Metadata;
+use crate::core::theme::Theme;
 
 
 pub struct MindMapApp {
     map: MindMap,                       // the mind map data
+    theme: Theme,                       // app theme
 
     // Interaction state
     dragging_node: Option<Uuid>,        // currently dragged node
@@ -71,6 +73,14 @@ pub struct MindMapApp {
     show_edge_color_picker: bool,       // Whether to show edge color picker
     edge_color_picker_id: Option<Uuid>, // Edge ID for which color picker is shown
     selected_edge_color: egui::Color32, // Currently selected edge color
+
+    // Annotation state
+    show_tags_panel: bool,              // whether to show tags panel
+    show_add_tag_dialog: bool,         // whether to show add tag dialog
+    show_edit_tag_dialog: bool,         // whether to show edit tag dialog
+    edit_tag_id: Option<Uuid>,          // tag currently being edited
+    edit_tag: EditableTag,              // editable tag fields
+    tags_node_id: Option<Uuid>,          // node whose tags are being viewed/edited
 }
 
 // Helper struct for editing metadata
@@ -80,6 +90,12 @@ struct EditableMetadata {
     authors: String,
     keywords: String,
     date: String,
+}
+
+#[derive(Debug, Clone, Default)]
+struct EditableTag {
+    name: String,
+    color: egui::Color32,
 }
 
 // Annotation types
@@ -143,7 +159,15 @@ struct EditableAnnotation {
 
 impl MindMapApp {
     fn main_view(&mut self, ctx: &egui::Context) {
-        egui::CentralPanel::default().show(ctx, |ui| {
+        let main_frame = egui::containers::Frame {
+            inner_margin: Default::default(),
+            fill: self.theme.main_background,
+            stroke: Default::default(),
+            corner_radius: Default::default(),
+            outer_margin: Default::default(),
+            shadow: Default::default(),
+        };
+        egui::CentralPanel::default().frame(main_frame).show(ctx, |ui| {
             ui.heading("RefMap");
 
             // Create a canvas region that captures click + drag
@@ -570,7 +594,7 @@ impl MindMapApp {
                 let fill = if let Some(edge_color) = edge.color {
                     edge_color
                 } else {
-                    egui::Color32::GRAY.to_array()
+                    self.theme.default_edge_color.to_array()
                 };
                 let mut width = 2.0;
                 if self.selected_edges.contains(&edge.id) {
@@ -713,7 +737,7 @@ impl MindMapApp {
                 if self.selected_nodes.contains(&node.id) {
                     egui::Color32::from_rgb(180, 220, 255).to_array()
                 } else {
-                    egui::Color32::LIGHT_BLUE.to_array()
+                    self.theme.default_node_color.to_array()
                 }
             };
             let stroke = if self.selected_nodes.contains(&node.id) {
@@ -764,8 +788,20 @@ impl MindMapApp {
                     egui::Align2::CENTER_CENTER,
                     &node.title,
                     font_id.clone(),
-                    egui::Color32::BLACK,
+                    self.theme.node_text_color,
                 );
+            }
+
+            // Draw tags
+            let mut tag_offset = 0.0;
+            for tag in &node.tags {
+                let tag_size = egui::vec2(10.0, 10.0) * self.zoom;
+                let tag_pos = node_rect.right_bottom() - egui::vec2(5.0 + tag_offset, 5.0) * self.zoom;
+                let tag_rect = egui::Rect::from_min_size(tag_pos, tag_size);
+
+                painter.rect_filled(tag_rect, 5.0, egui::Color32::from_rgba_unmultiplied(tag.color[0], tag.color[1], tag.color[2], tag.color[3]));
+
+                tag_offset += 15.0 * self.zoom;
             }
         }
     }
@@ -782,7 +818,20 @@ impl MindMapApp {
     }
 
     fn menu_bar(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
+        let menu_frame = egui::containers::Frame {
+            inner_margin: Margin{
+                left: 5,
+                right: 0,
+                top: 0,
+                bottom: 0,
+            },
+            fill: self.theme.top_bar_background,
+            stroke: Default::default(),
+            corner_radius: Default::default(),
+            outer_margin: Default::default(),
+            shadow: Default::default(),
+        };
+        egui::TopBottomPanel::top("menu_bar").frame(menu_frame).show(ctx, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     if ui.button("New").clicked() {
@@ -863,17 +912,34 @@ impl MindMapApp {
                                 self.show_node_context_menu = false;
                             }
 
+                            if ui.button("View Tags").clicked() {
+                                if let Some(node_id) = self.rightclick_node {
+                                    self.tags_node_id = Some(node_id);
+                                    self.show_tags_panel = true;
+                                }
+                                self.show_node_context_menu = false;
+                            }
+
+                            if ui.button("Add Tag").clicked() {
+                                if let Some(node_id) = self.rightclick_node {
+                                    self.tags_node_id = Some(node_id);
+                                    self.edit_tag = EditableTag::default();
+                                    self.show_add_tag_dialog = true;
+                                }
+                                self.show_node_context_menu = false;
+                            }
+
                             if ui.button("Change Color").clicked() {
                                 self.node_color_picker_id = Some(self.rightclick_node.unwrap());
                                 self.show_node_color_picker = true;
 
                                 if let Some(node) = self.map.nodes.iter().find(|n| n.id == self.node_color_picker_id.unwrap()) {
-                                    self.selected_node_color = egui::Color32::from_rgba_unmultiplied(node.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[0],
-                                                                                                  node.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[1],
-                                                                                                  node.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[2],
-                                                                                                  node.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[3]);
+                                    self.selected_node_color = egui::Color32::from_rgba_unmultiplied(node.color.unwrap_or(self.theme.default_node_color.to_array())[0],
+                                                                                                  node.color.unwrap_or(self.theme.default_node_color.to_array())[1],
+                                                                                                  node.color.unwrap_or(self.theme.default_node_color.to_array())[2],
+                                                                                                  node.color.unwrap_or(self.theme.default_node_color.to_array())[3]);
                                 } else {
-                                    self.selected_node_color = egui::Color32::LIGHT_BLUE;
+                                    self.selected_node_color = self.theme.default_node_color;
                                 }
 
                                 self.show_node_context_menu = false;
@@ -946,12 +1012,12 @@ impl MindMapApp {
                                 self.show_edge_color_picker = true;
 
                                 if let Some(edge) = self.map.edges.iter().find(|n| n.id == self.edge_color_picker_id.unwrap()) {
-                                    self.selected_edge_color = egui::Color32::from_rgba_unmultiplied(edge.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[0],
-                                                                                                     edge.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[1],
-                                                                                                     edge.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[2],
-                                                                                                     edge.color.unwrap_or(egui::Color32::LIGHT_BLUE.to_array())[3]);
+                                    self.selected_edge_color = egui::Color32::from_rgba_unmultiplied(edge.color.unwrap_or(self.theme.default_node_color.to_array())[0],
+                                                                                                     edge.color.unwrap_or(self.theme.default_node_color.to_array())[1],
+                                                                                                     edge.color.unwrap_or(self.theme.default_node_color.to_array())[2],
+                                                                                                     edge.color.unwrap_or(self.theme.default_node_color.to_array())[3]);
                                 } else {
-                                    self.selected_edge_color = egui::Color32::LIGHT_BLUE;
+                                    self.selected_edge_color = self.theme.default_node_color;
                                 }
 
                                 self.show_edge_context_menu = false;
@@ -1063,6 +1129,49 @@ impl MindMapApp {
         }
     }
 
+    fn show_tags_panel(&mut self, ctx: &egui::Context) {
+        if self.show_tags_panel {
+            if let Some(node_id) = self.tags_node_id {
+                egui::Window::new("Tags")
+                    .collapsible(false)
+                    .resizable(true)
+                    .default_width(400.0)
+                    .default_height(600.0)
+                    .show(ctx, |ui| {
+                        // Find the node and clone the data we need
+                        let node_data = self.map.nodes.iter()
+                            .find(|n| n.id == node_id)
+                            .map(|n| (n.title.clone(), n.tags.clone()));
+
+                        if let Some((node_title, tags)) = node_data {
+                            ui.heading(format!("Tags for: {}", node_title));
+                            ui.separator();
+
+                            // Add new annotation button
+                            if ui.button("➕ Add New Tag").clicked() {
+                                self.edit_tag = EditableTag::default();
+                                self.show_add_tag_dialog = true;
+                            }
+
+                            ui.separator();
+
+                            // Show existing annotations
+                            self.show_existing_tags(tags, ui, node_id);
+
+                            ui.horizontal(|ui| {
+                                if ui.button("Close").clicked() {
+                                    self.show_tags_panel = false;
+                                    self.tags_node_id = None;
+                                }
+                            });
+                        } else {
+                            ui.label("Node not found");
+                        }
+                    });
+            }
+        }
+    }
+
     fn show_annotation_card(&mut self, ui: &mut egui::Ui, annotation: &Annotation, id: Uuid) {
         let frame = egui::Frame::new()
             .inner_margin(egui::Margin::same(8))
@@ -1072,7 +1181,7 @@ impl MindMapApp {
         frame.show(ui, |ui| {
             ui.horizontal(|ui| {
                 if !annotation.title.is_empty() {
-                    ui.label(egui::RichText::new(&annotation.title).strong().color(egui::Color32::WHITE));
+                    ui.label(egui::RichText::new(&annotation.title).strong().color(self.theme.annotation_title));
                 }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -1093,16 +1202,46 @@ impl MindMapApp {
                     }
 
                     if let Some(page) = annotation.page_number {
-                        ui.label(format!("p.{}", page));
+                        ui.label(egui::RichText::new(format!("p.{}",page)).strong().color(self.theme.annotation_date));
                     }
                 });
             });
 
             if !annotation.content.is_empty() {
-                ui.label(&annotation.content);
+                ui.label(egui::RichText::new(&annotation.content).strong().color(self.theme.annotation_body));
             }
 
-            ui.label(egui::RichText::new(&annotation.created_at).small().color(egui::Color32::DARK_GRAY));
+            ui.label(egui::RichText::new(&annotation.created_at).small().color(self.theme.annotation_date));
+        });
+    }
+
+    fn show_tag(&mut self, ui: &mut egui::Ui, tag: &Tag, id: Uuid) {
+        let frame = egui::Frame::new()
+            .fill(egui::Color32::from_rgba_unmultiplied(tag.color[0], tag.color[1], tag.color[2], tag.color[3]))
+            .inner_margin(egui::Margin::same(8))
+            .corner_radius(4.0)
+            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgba_unmultiplied(tag.color[0], tag.color[1], tag.color[2], tag.color[3])));
+
+        frame.show(ui, |ui| {
+            ui.horizontal(|ui| {
+                if !tag.name.is_empty() {
+                    ui.label(egui::RichText::new(&tag.name).strong().color(self.theme.main_foreground));
+                }
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.small_button("🗑").on_hover_text("Delete").clicked() {
+                        // Remove annotation
+                        if let Some(node) = self.map.nodes.iter_mut().find(|n| n.id == id) {
+                            node.tags.retain(|a| a.id != tag.id);
+                            self.dirty = true;
+                        }
+                    }
+
+                    if ui.small_button("✏").on_hover_text("Edit").clicked() {
+                        self.start_editing_tag(tag.clone());
+                    }
+                });
+            });
         });
     }
 
@@ -1177,6 +1316,59 @@ impl MindMapApp {
         }
     }
 
+    fn show_tag_dialog(&mut self, ctx: &egui::Context) {
+        let is_editing = self.show_edit_tag_dialog;
+        let show_dialog = self.show_add_tag_dialog || is_editing;
+
+        if show_dialog {
+            let title = if is_editing { "Edit Tag" } else { "Add New Tag" };
+
+            egui::Window::new(title)
+                .collapsible(false)
+                .resizable(true)
+                .default_width(400.0)
+                .show(ctx, |ui| {
+                    ui.label("Create a new tag for this node:");
+                    ui.separator();
+
+                    ui.horizontal(|ui| {
+                        ui.label("Name:");
+                        ui.text_edit_singleline(&mut self.edit_tag.name);
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.label("Color:");
+                        let mut color = self.edit_tag.color;
+                        if ui.color_edit_button_srgba(&mut color).changed() {
+                            self.edit_tag.color = color;
+                        }
+                    });
+
+                    ui.separator();
+
+                    ui.horizontal(|ui| {
+                        let save_text = if is_editing { "Update" } else { "Add" };
+                        if ui.button(save_text).clicked() {
+                            self.save_tag();
+                            if is_editing {
+                                self.show_edit_tag_dialog = false;
+                            } else {
+                                self.show_add_tag_dialog = false;
+                            }
+                        }
+
+                        if ui.button("Cancel").clicked() {
+                            if is_editing {
+                                self.show_edit_tag_dialog = false;
+                            } else {
+                                self.show_add_tag_dialog = false;
+                            }
+                        }
+                    });
+                });
+        }
+    }
+
     fn start_editing_annotation(&mut self, annotation: Annotation) {
         self.edit_annotation_id = Some(annotation.id);
         self.edit_annotation = EditableAnnotation {
@@ -1186,6 +1378,15 @@ impl MindMapApp {
             page_number: annotation.page_number.map_or(String::new(), |p| p.to_string()),
         };
         self.show_edit_annotation_dialog = true;
+    }
+
+    fn start_editing_tag(&mut self, tag: Tag) {
+        self.edit_tag_id = Some(tag.id);
+        self.edit_tag = EditableTag {
+            name: tag.name,
+            color: egui::Color32::from_rgba_unmultiplied(tag.color[0], tag.color[1], tag.color[2], tag.color[3]),
+        };
+        self.show_edit_tag_dialog = true;
     }
 
     fn save_annotation(&mut self) {
@@ -1256,6 +1457,31 @@ impl MindMapApp {
                     };
                     edge.annotations.push(annotation);
                 }
+                self.dirty = true;
+            }
+        }
+    }
+
+    fn save_tag(&mut self) {
+        if let Some(node_id) = self.tags_node_id {
+            if let Some(node) = self.map.nodes.iter_mut().find(|n| n.id == node_id) {
+               if let Some(edit_id) = self.edit_tag_id {
+                    // Editing existing tags
+                    if let Some(tag) = node.tags.iter_mut().find(|a| a.id == edit_id) {
+                        tag.name = self.edit_tag.name.clone();
+                        tag.color = self.edit_tag.color.to_array();
+                    }
+                    self.edit_tag_id = None;
+                } else {
+                    // Adding new annotation
+                    let tag = Tag {
+                        id: Uuid::new_v4(),
+                        name: self.edit_tag.name.clone(),
+                        color: self.edit_tag.color.to_array(),
+                    };
+                    node.tags.push(tag);
+                }
+
                 self.dirty = true;
             }
         }
@@ -1607,13 +1833,31 @@ impl MindMapApp {
             }
         });
     }
+
+    fn show_existing_tags(&mut self, tags: Vec<Tag>, ui: &mut egui::Ui, node_id: Uuid) {
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            for tag in &tags {
+                self.show_tag(ui, tag, node_id);
+                ui.separator();
+            }
+
+            if tags.is_empty() {
+                ui.label("No tags yet. Click 'Add New Tag' to get started!");
+            }
+        });
+    }
 }
 
 impl Default for MindMapApp {
     fn default() -> Self {
         let map = MindMap::default();
+        let mut theme: Theme = Theme::default();
+        if let Ok(t) = get_theme() {
+            theme = Theme::from_serializeable(t)
+        }
         let mut app = Self {
             map,
+            theme,
             dragging_node: None,
             connecting_from: None,
             selected_nodes: Vec::new(),
@@ -1653,6 +1897,12 @@ impl Default for MindMapApp {
             show_edge_color_picker: false,
             edge_color_picker_id: None,
             selected_edge_color: egui::Color32::WHITE,
+            show_tags_panel: false,
+            show_add_tag_dialog: false,
+            show_edit_tag_dialog: false,
+            edit_tag_id: None,
+            edit_tag: EditableTag::default(),
+            tags_node_id: None,
         };
         // Load last file if it exists
         if let Ok(last_file) = load_last_file() {
@@ -1688,6 +1938,10 @@ impl eframe::App for MindMapApp {
         // Show annotation dialogs
         self.show_annotations_panel(ctx);
         self.show_annotation_dialog(ctx);
+
+        // Show annotation dialogs
+        self.show_tags_panel(ctx);
+        self.show_tag_dialog(ctx);
 
         // Show edge context menu if active
         self.show_edge_context_menu(ctx);

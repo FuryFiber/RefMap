@@ -1,0 +1,60 @@
+{
+  "nodes": [
+    {
+      "id": "e385fa24-a700-4023-ab84-14ba872e2f5e",
+      "title": "New",
+      "metadata": null,
+      "x": 241.34375,
+      "y": 506.92188,
+      "collapsed": true,
+      "path": null,
+      "annotations": [],
+      "color": null,
+      "tags": [
+        {
+          "name": "sdfg",
+          "color": [
+            255,
+            0,
+            0,
+            255
+          ],
+          "id": "c9e9c16b-6aaa-443d-bdcc-20e07e0c3a4d"
+        },
+        {
+          "name": "sdfgds",
+          "color": [
+            0,
+            255,
+            25,
+            255
+          ],
+          "id": "1892b63f-b92e-4192-a152-54bf907814a2"
+        },
+        {
+          "name": "asdfss",
+          "color": [
+            0,
+            116,
+            255,
+            255
+          ],
+          "id": "3ff1c929-a643-4ee9-a63b-0d2fe4cc2883"
+        }
+      ]
+    },
+    {
+      "id": "5fefaca0-5da8-4e16-a138-1dcf2187c759",
+      "title": "New",
+      "metadata": null,
+      "x": 41.617188,
+      "y": 117.15625,
+      "collapsed": true,
+      "path": null,
+      "annotations": [],
+      "color": null,
+      "tags": []
+    }
+  ],
+  "edges": []
+}
