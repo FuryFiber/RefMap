@@ -1,5 +1,4 @@
 use crate::core::map::MindMap;
-use crate::core::theme::SerializeableTheme;
 use std::{fs, io};
 use std::fs::File;
 use std::io::{Read, Write};
@@ -130,11 +129,4 @@ pub fn export_project(project_dir: &str, zip_path: &str) -> Result<()> {
 
     zip.finish()?;
     Ok(())
-}
-
-pub fn get_theme() -> Result<SerializeableTheme, anyhow::Error> {
-    let config_dir = get_config_dir();
-    let json_path = config_dir.join("theme.json");
-    let data = fs::read_to_string(&json_path)?;
-    Ok(serde_json::from_str(&data)?)
 }

@@ -3,14 +3,12 @@ use rfd::FileDialog;
 use uuid::Uuid;
 use crate::core::map::{EdgeType, Node, Tag};
 use crate::core::MindMap;
-use crate::core::storage::{export_project, get_theme, load_last_file, load_map, save_last_file, save_map};
+use crate::core::storage::{export_project, load_last_file, load_map, save_last_file, save_map};
 use crate::core::pdfparser::Metadata;
-use crate::core::theme::Theme;
 
 
 pub struct MindMapApp {
     map: MindMap,                       // the mind map data
-    theme: Theme,                       // app theme
 
     // Interaction state
     dragging_node: Option<Uuid>,        // currently dragged node
@@ -161,7 +159,7 @@ impl MindMapApp {
     fn main_view(&mut self, ctx: &egui::Context) {
         let main_frame = egui::containers::Frame {
             inner_margin: Default::default(),
-            fill: self.theme.main_background,
+            fill: egui::Color32::from_hex("#30313c").unwrap(),
             stroke: Default::default(),
             corner_radius: Default::default(),
             outer_margin: Default::default(),
@@ -594,7 +592,7 @@ impl MindMapApp {
                 let fill = if let Some(edge_color) = edge.color {
                     edge_color
                 } else {
-                    self.theme.default_edge_color.to_array()
+                    egui::Color32::GRAY.to_array()
                 };
                 let mut width = 2.0;
                 if self.selected_edges.contains(&edge.id) {
@@ -737,7 +735,7 @@ impl MindMapApp {
                 if self.selected_nodes.contains(&node.id) {
                     egui::Color32::from_rgb(180, 220, 255).to_array()
                 } else {
-                    self.theme.default_node_color.to_array()
+                    egui::Color32::LIGHT_BLUE.to_array()
                 }
             };
             let stroke = if self.selected_nodes.contains(&node.id) {
@@ -788,7 +786,7 @@ impl MindMapApp {
                     egui::Align2::CENTER_CENTER,
                     &node.title,
                     font_id.clone(),
-                    self.theme.node_text_color,
+                    egui::Color32::BLACK
                 );
             }
 
@@ -825,7 +823,7 @@ impl MindMapApp {
                 top: 0,
                 bottom: 0,
             },
-            fill: self.theme.top_bar_background,
+            fill: egui::Color32::from_hex("#30313c").unwrap(),
             stroke: Default::default(),
             corner_radius: Default::default(),
             outer_margin: Default::default(),
@@ -887,6 +885,7 @@ impl MindMapApp {
                 .order(egui::Order::Tooltip)
                 .show(ctx, |ui| {
                     egui::Frame::popup(ui.style())
+                        .fill(egui::Color32::from_hex("#30313c").unwrap())
                         .show(ui, |ui| {
                             ui.set_min_width(150.0);
 
@@ -933,13 +932,10 @@ impl MindMapApp {
                                 self.node_color_picker_id = Some(self.rightclick_node.unwrap());
                                 self.show_node_color_picker = true;
 
-                                if let Some(node) = self.map.nodes.iter().find(|n| n.id == self.node_color_picker_id.unwrap()) {
-                                    self.selected_node_color = egui::Color32::from_rgba_unmultiplied(node.color.unwrap_or(self.theme.default_node_color.to_array())[0],
-                                                                                                  node.color.unwrap_or(self.theme.default_node_color.to_array())[1],
-                                                                                                  node.color.unwrap_or(self.theme.default_node_color.to_array())[2],
-                                                                                                  node.color.unwrap_or(self.theme.default_node_color.to_array())[3]);
+                                if let Some(_node) = self.map.nodes.iter().find(|n| n.id == self.node_color_picker_id.unwrap()) {
+                                    self.selected_node_color = egui::Color32::LIGHT_BLUE;
                                 } else {
-                                    self.selected_node_color = self.theme.default_node_color;
+                                    self.selected_node_color = egui::Color32::LIGHT_BLUE;
                                 }
 
                                 self.show_node_context_menu = false;
@@ -977,6 +973,7 @@ impl MindMapApp {
                 .order(egui::Order::Tooltip)
                 .show(ctx, |ui| {
                     egui::Frame::popup(ui.style())
+                        .fill(egui::Color32::from_hex("#30313c").unwrap())
                         .show(ui, |ui| {
                             ui.set_min_width(150.0);
 
@@ -1011,13 +1008,10 @@ impl MindMapApp {
                                 self.edge_color_picker_id = Some(self.rightclick_edge.unwrap());
                                 self.show_edge_color_picker = true;
 
-                                if let Some(edge) = self.map.edges.iter().find(|n| n.id == self.edge_color_picker_id.unwrap()) {
-                                    self.selected_edge_color = egui::Color32::from_rgba_unmultiplied(edge.color.unwrap_or(self.theme.default_node_color.to_array())[0],
-                                                                                                     edge.color.unwrap_or(self.theme.default_node_color.to_array())[1],
-                                                                                                     edge.color.unwrap_or(self.theme.default_node_color.to_array())[2],
-                                                                                                     edge.color.unwrap_or(self.theme.default_node_color.to_array())[3]);
+                                if let Some(_edge) = self.map.edges.iter().find(|n| n.id == self.edge_color_picker_id.unwrap()) {
+                                    self.selected_edge_color = egui::Color32::LIGHT_BLUE;
                                 } else {
-                                    self.selected_edge_color = self.theme.default_node_color;
+                                    self.selected_edge_color = egui::Color32::LIGHT_BLUE;
                                 }
 
                                 self.show_edge_context_menu = false;
@@ -1051,7 +1045,9 @@ impl MindMapApp {
     fn show_annotations_panel(&mut self, ctx: &egui::Context) {
         if self.show_annotations_panel {
             if let Some(node_id) = self.annotations_node_id {
+                let frame = get_popup_frame();
                 egui::Window::new("Annotations")
+                    .frame(frame)
                     .collapsible(false)
                     .resizable(true)
                     .default_width(400.0)
@@ -1131,8 +1127,10 @@ impl MindMapApp {
 
     fn show_tags_panel(&mut self, ctx: &egui::Context) {
         if self.show_tags_panel {
+            let frame = get_popup_frame();
             if let Some(node_id) = self.tags_node_id {
                 egui::Window::new("Tags")
+                    .frame(frame)
                     .collapsible(false)
                     .resizable(true)
                     .default_width(400.0)
@@ -1181,7 +1179,7 @@ impl MindMapApp {
         frame.show(ui, |ui| {
             ui.horizontal(|ui| {
                 if !annotation.title.is_empty() {
-                    ui.label(egui::RichText::new(&annotation.title).strong().color(self.theme.annotation_title));
+                    ui.label(egui::RichText::new(&annotation.title).strong().color(egui::Color32::WHITE));
                 }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -1202,16 +1200,16 @@ impl MindMapApp {
                     }
 
                     if let Some(page) = annotation.page_number {
-                        ui.label(egui::RichText::new(format!("p.{}",page)).strong().color(self.theme.annotation_date));
+                        ui.label(egui::RichText::new(format!("p.{}",page)).strong().color(egui::Color32::DARK_GRAY));
                     }
                 });
             });
 
             if !annotation.content.is_empty() {
-                ui.label(egui::RichText::new(&annotation.content).strong().color(self.theme.annotation_body));
+                ui.label(egui::RichText::new(&annotation.content).strong().color(egui::Color32::LIGHT_GRAY));
             }
 
-            ui.label(egui::RichText::new(&annotation.created_at).small().color(self.theme.annotation_date));
+            ui.label(egui::RichText::new(&annotation.created_at).small().color(egui::Color32::DARK_GRAY));
         });
     }
 
@@ -1225,7 +1223,7 @@ impl MindMapApp {
         frame.show(ui, |ui| {
             ui.horizontal(|ui| {
                 if !tag.name.is_empty() {
-                    ui.label(egui::RichText::new(&tag.name).strong().color(self.theme.main_foreground));
+                    ui.label(egui::RichText::new(&tag.name).strong().color(egui::Color32::WHITE));
                 }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -1248,11 +1246,11 @@ impl MindMapApp {
     fn show_annotation_dialog(&mut self, ctx: &egui::Context) {
         let is_editing = self.show_edit_annotation_dialog;
         let show_dialog = self.show_add_annotation_dialog || is_editing;
-
         if show_dialog {
             let title = if is_editing { "Edit Annotation" } else { "Add New Annotation" };
-
+            let frame = get_popup_frame();
             egui::Window::new(title)
+                .frame(frame)
                 .collapsible(false)
                 .resizable(true)
                 .default_width(400.0)
@@ -1322,8 +1320,9 @@ impl MindMapApp {
 
         if show_dialog {
             let title = if is_editing { "Edit Tag" } else { "Add New Tag" };
-
+            let frame = get_popup_frame();
             egui::Window::new(title)
+                .frame(frame)
                 .collapsible(false)
                 .resizable(true)
                 .default_width(400.0)
@@ -1851,13 +1850,8 @@ impl MindMapApp {
 impl Default for MindMapApp {
     fn default() -> Self {
         let map = MindMap::default();
-        let mut theme: Theme = Theme::default();
-        if let Ok(t) = get_theme() {
-            theme = Theme::from_serializeable(t)
-        }
         let mut app = Self {
             map,
-            theme,
             dragging_node: None,
             connecting_from: None,
             selected_nodes: Vec::new(),
@@ -1917,6 +1911,10 @@ impl Default for MindMapApp {
 
 impl eframe::App for MindMapApp {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+        ctx.style_mut(|style| {
+            style.visuals.extreme_bg_color = egui::Color32::from_hex("#22222a").unwrap()
+        });
+
         // autosave
         if self.dirty && self.last_save.elapsed().as_secs() > 5 {
             if let Some(path) = &self.current_file {
@@ -2031,5 +2029,22 @@ fn point_line_distance(a: Pos2, b: Pos2, p: Pos2) -> f32 {
     let t = (ap.dot(ab) / ab_len.powi(2)).clamp(0.0, 1.0);
     let proj = a + ab * t;
     (p - proj).length()
+}
+
+fn get_popup_frame() -> egui::Frame {
+    let frame = egui::Frame{
+        inner_margin: Default::default(),
+        fill: egui::Color32::from_hex("#2b2c36").unwrap(),
+        stroke: Default::default(),
+        corner_radius: Default::default(),
+        outer_margin: Default::default(),
+        shadow: egui::Shadow{
+            offset: [5,5],
+            blur: 20,
+            spread: 0,
+            color: egui::Color32::BLACK,
+        },
+    };
+    frame
 }
 

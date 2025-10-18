@@ -54,7 +54,112 @@
       "annotations": [],
       "color": null,
       "tags": []
+    },
+    {
+      "id": "ec15f095-3f55-47f8-b863-d56e6f1bfaae",
+      "title": "New",
+      "metadata": null,
+      "x": 520.6758,
+      "y": 221.13672,
+      "collapsed": true,
+      "path": null,
+      "annotations": [],
+      "color": null,
+      "tags": []
+    },
+    {
+      "id": "8d389c9b-913a-4aad-9211-c7a92e4e6d79",
+      "title": "/home/flor/Documents/Dev/RefMap/test/pdfs/can20.pdf",
+      "metadata": {
+        "title": "",
+        "keywords": [],
+        "authors": [],
+        "date": "Mon Jul  1 09:43:16 1996 CEST",
+        "path": "/home/flor/Documents/Dev/RefMap/test/pdfs/can20.pdf"
+      },
+      "x": 538.58594,
+      "y": 567.65625,
+      "collapsed": true,
+      "path": "/home/flor/Documents/Dev/RefMap/test/pdfs/can20.pdf",
+      "annotations": [],
+      "color": null,
+      "tags": []
+    },
+    {
+      "id": "2c46eddf-2dbd-4eed-b065-dc8762098681",
+      "title": "Zero-Wire: A Deterministic and Low-Latency Wireless Bus Through Symbol-Synchronous Transmission of Optical Signals",
+      "metadata": {
+        "title": "Zero-Wire: A Deterministic and Low-Latency Wireless Bus Through Symbol-Synchronous Transmission of Optical Signals",
+        "keywords": [
+          "Internet of Things",
+          "wireless sensor networks",
+          "cyber-physical systems",
+          "visible light communication",
+          "optical wireless communication",
+          "concurrent transmission",
+          "synchronous transmission",
+          "cut-through forwarding",
+          "bus networks"
+        ],
+        "authors": [
+          "Jonathan Oostvogels; Fan Yang; Sam Michiels; and Danny Hughes"
+        ],
+        "date": "Tue Oct 20 12:17:45 2020 CEST",
+        "path": "/home/flor/Documents/Dev/RefMap/test/pdfs/Zero-Wire.pdf"
+      },
+      "x": 501.80078,
+      "y": 454.57812,
+      "collapsed": true,
+      "path": "/home/flor/Documents/Dev/RefMap/test/pdfs/Zero-Wire.pdf",
+      "annotations": [
+        {
+          "id": "bb427203-dfa3-453c-98a4-faa6be05d145",
+          "annotation_type": "TextNote",
+          "title": "asda",
+          "content": "asdf",
+          "created_at": "2025-10-18 09:34:48 UTC",
+          "page_number": null
+        },
+        {
+          "id": "8f143651-c0d3-49ae-8b8f-4b4eefa76265",
+          "annotation_type": "TextNote",
+          "title": "asdf",
+          "content": "asdf",
+          "created_at": "2025-10-18 09:35:13 UTC",
+          "page_number": null
+        }
+      ],
+      "color": null,
+      "tags": [
+        {
+          "name": "asdfas",
+          "color": [
+            255,
+            0,
+            0,
+            255
+          ],
+          "id": "59ab495c-25f8-4dbf-9a7d-7bf48997d24f"
+        }
+      ]
     }
   ],
-  "edges": []
+  "edges": [
+    {
+      "id": "ee701bdb-7c1f-43b3-8f90-8b79fc137588",
+      "from": "ec15f095-3f55-47f8-b863-d56e6f1bfaae",
+      "to": "e385fa24-a700-4023-ab84-14ba872e2f5e",
+      "edge_type": "Normal",
+      "annotations": [],
+      "color": null
+    },
+    {
+      "id": "26c673dd-15df-475b-9a4f-64a31cd29bc9",
+      "from": "8d389c9b-913a-4aad-9211-c7a92e4e6d79",
+      "to": "e385fa24-a700-4023-ab84-14ba872e2f5e",
+      "edge_type": "References",
+      "annotations": [],
+      "color": null
+    }
+  ]
 }
