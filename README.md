@@ -24,8 +24,10 @@ It allows users to create a visual overview of the documentation that was gather
 ---
 
 ## Getting Started
-1. **Installation**: build from source using `cargo build --release` or run the install script `install.sh` which will build the application and create a `.desktop` entry so RefMap is visible in you launcher.
-2. **Launch**: Run the executable (`refmap` or `refmap.exe`) to start the application.
+1. **Installation**: build from source using `cargo build --release` or run the install script `install.sh` which will build the application and create a `.desktop` entry so RefMap is visible in your launcher.
+2. **Launch**: 
+   - Run the executable (`refmap` or `refmap.exe`) to start the application.
+   - Alternatively use `cargo run`
 
 ---
 
@@ -38,10 +40,11 @@ It allows users to create a visual overview of the documentation that was gather
 ## Adding Nodes
 ### Basic Node
 - **Double-click** on the canvas to create a new basic node.
-- **Double-click** on a node to open its associated PDF file (if any) in your default pdf viewer.
+- **CTRL + Click** will expand the node to show its metadata
 
 ### PDF Node
 - **Shift + Left-click** to open the file picker and add a PDF node. The metadata from the PDF will be automatically populated.
+- **Double-click** on a pdf-node to open the pdf in your default file browser
 
 ---
 
@@ -56,6 +59,8 @@ It allows users to create a visual overview of the documentation that was gather
     - **Edit Metadata**: Modify the node's title, authors, keywords, and date.
     - **View Annotations**: Open the annotations panel for this node.
     - **Add Annotation**: Create a new annotation for this node.
+    - **View Tags**: Open the tags panel for this node.
+    - **Add Tag**: Select an existing tag or create a new one and add it to this node.
     - **Change Color**: Change the node's color
     - **Delete Node**: Remove the selected node.
 
@@ -115,7 +120,7 @@ Annotations are color-coded notes attached to specific nodes. Each annotation ty
 ## Zooming and Panning
 | Mouse               | Trackpad                    | Action          |
 |---------------------|-----------------------------|-----------------|
-| `Scroll`            | `CTRL + Scroll`             | zoom in and out |
+| `CTRL + Scroll`     | `CTRL + Scroll`             | zoom in and out |
 | `Middle click drag` | `CTRL + Primary click drag` | pan             |
 
 
@@ -145,11 +150,12 @@ Annotations are color-coded notes attached to specific nodes. Each annotation ty
 
 ## Advanced Features
 ### Collapsing Nodes
-- **Ctrl + Click** a node to toggle its collapsed state. This hides metadata to show only the title.
+- **Ctrl + Click** a node to toggle its collapsed state. This hides metadata to show only the title. **Ctrl + Click** again to expand the node again.
 
 ### Annotation Panel
 - Opens with **View Annotations** from the context menu. Displays all annotations for the selected node with options to edit or delete.
-
+### Tags Panel
+- Opens with **View Tags** from the node context menu. Displays all tags for the selected node with options to edit or delete.
 ---
 
 ## Troubleshooting
