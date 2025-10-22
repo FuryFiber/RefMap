@@ -47,6 +47,7 @@ pub struct Tag {
  pub struct MindMap {
      pub nodes: Vec<Node>,
      pub edges: Vec<Edge>,
+     pub(crate) tags: Vec<Tag>,
  }
 
  impl MindMap {

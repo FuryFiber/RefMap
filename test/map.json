@@ -1,35 +1,56 @@
 {
   "nodes": [
     {
-      "id": "5aff796c-519d-402b-a948-278f78b8886e",
+      "id": "a3aea74e-e94a-46e6-b8c4-9c3495d115da",
       "title": "New",
       "metadata": null,
-      "x": 466.53125,
-      "y": 622.9922,
+      "x": 482.23438,
+      "y": 696.2539,
       "collapsed": true,
       "path": null,
       "annotations": [],
       "color": null,
       "tags": [
-        "3725f82e-d60a-4574-9556-1b7d856b8012",
-        "2dea88a2-961c-4be1-b627-82b795f68ba3"
+        "b3a97c4d-1459-4a41-ad23-878fec78b733"
       ]
     },
     {
-      "id": "dc5cdddc-66d4-4607-9986-bd683be032c1",
+      "id": "17e85289-a385-4645-a2b2-8b27e69d2bd3",
       "title": "New",
       "metadata": null,
-      "x": 836.77344,
-      "y": 879.5742,
+      "x": 717.64453,
+      "y": 855.6875,
       "collapsed": true,
       "path": null,
       "annotations": [],
       "color": null,
       "tags": [
-        "1c4bc491-9cdc-4046-8a20-4cc9fd4ee293",
-        "2dea88a2-961c-4be1-b627-82b795f68ba3"
+        "05044800-bfac-482a-b286-06e7898ce2ba",
+        "b3a97c4d-1459-4a41-ad23-878fec78b733"
       ]
     }
   ],
-  "edges": []
+  "edges": [],
+  "tags": [
+    {
+      "name": "asdaf",
+      "color": [
+        107,
+        255,
+        0,
+        255
+      ],
+      "id": "b3a97c4d-1459-4a41-ad23-878fec78b733"
+    },
+    {
+      "name": "",
+      "color": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "id": "05044800-bfac-482a-b286-06e7898ce2ba"
+    }
+  ]
 }

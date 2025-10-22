@@ -80,7 +80,6 @@ pub struct MindMapApp {
     edit_tag: EditableTag,              // editable tag fields
     tags_node_id: Option<Uuid>,          // node whose tags are being viewed/edited
 
-    tags: Vec<Tag>,                     // list of tags in the mind map
 
 }
 
@@ -797,7 +796,7 @@ impl MindMapApp {
             // Draw tags
             let mut tag_offset = 0.0;
             for tag in &node.tags {
-                if let Some(tag) = self.tags.iter().find(|t| t.id == *tag) {
+                if let Some(tag) = self.map.tags.iter().find(|t| t.id == *tag) {
                     let tag_size = egui::vec2(10.0, 10.0) * self.zoom;
                     let tag_pos = node_rect.right_bottom() - egui::vec2(5.0 + tag_offset, 5.0) * self.zoom;
                     let tag_rect = egui::Rect::from_min_size(tag_pos, tag_size);
@@ -1337,7 +1336,7 @@ impl MindMapApp {
                     egui::ComboBox::from_label("")
                         .selected_text(self.edit_annotation.annotation_type.name())
                         .show_ui(ui, |ui| {
-                            for tag in &mut self.tags {
+                            for tag in &mut self.map.tags {
                                 ui.selectable_value(&mut self.edit_tag.id, tag.id.clone(), tag.name.as_str());
                             }
                         });
@@ -1495,7 +1494,7 @@ impl MindMapApp {
     fn create_tag(&mut self, is_editing: bool) {
         if is_editing {
             if let Some(tag_id) = self.edit_tag_id {
-                if let Some(tag) = self.tags.iter_mut().find(|t| t.id == tag_id) {
+                if let Some(tag) = self.map.tags.iter_mut().find(|t| t.id == tag_id) {
                     tag.name = self.edit_tag.name.clone();
                     let color = self.edit_tag.color;
                     tag.color = [color.r(), color.g(), color.b(), color.a()];
@@ -1508,7 +1507,7 @@ impl MindMapApp {
                 name: self.edit_tag.name.clone(),
                 color: [color.r(), color.g(), color.b(), color.a()],
             };
-            self.tags.push(new_tag.clone());
+            self.map.tags.push(new_tag.clone());
             if let Some(node_id) = self.tags_node_id {
                 if let Some(node) = self.map.nodes.iter_mut().find(|n| n.id == node_id) {
                     node.tags.push(new_tag.id);
@@ -1868,7 +1867,7 @@ impl MindMapApp {
     fn show_existing_tags(&mut self, tags: Vec<Uuid>, ui: &mut egui::Ui, node_id: Uuid) {
         egui::ScrollArea::vertical().show(ui, |ui| {
             for tag_id in &tags {
-                if let Some(tag) = self.tags.clone().iter().find(|t| &t.id == tag_id) {
+                if let Some(tag) = self.map.tags.clone().iter().find(|t| &t.id == tag_id) {
                     self.show_tag(ui, tag, node_id);
                     ui.separator();
                 }
@@ -1931,7 +1930,6 @@ impl Default for MindMapApp {
             edit_tag_id: None,
             edit_tag: EditableTag::default(),
             tags_node_id: None,
-            tags: Vec::new()
         };
         // Load last file if it exists
         if let Ok(last_file) = load_last_file() {
