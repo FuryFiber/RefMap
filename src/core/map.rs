@@ -14,7 +14,7 @@ pub struct Node {
     pub path: Option<String>,
     pub annotations: Vec<Annotation>,
     pub color: Option<[u8; 4]>,
-    pub tags: Vec<Tag>,
+    pub tags: Vec<Uuid>,
 }
 
  #[derive(Debug, Clone, Serialize, Deserialize)]

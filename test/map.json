@@ -1,165 +1,35 @@
 {
   "nodes": [
     {
-      "id": "e385fa24-a700-4023-ab84-14ba872e2f5e",
+      "id": "5aff796c-519d-402b-a948-278f78b8886e",
       "title": "New",
       "metadata": null,
-      "x": 241.34375,
-      "y": 506.92188,
+      "x": 466.53125,
+      "y": 622.9922,
       "collapsed": true,
       "path": null,
       "annotations": [],
       "color": null,
       "tags": [
-        {
-          "name": "sdfg",
-          "color": [
-            255,
-            0,
-            0,
-            255
-          ],
-          "id": "c9e9c16b-6aaa-443d-bdcc-20e07e0c3a4d"
-        },
-        {
-          "name": "sdfgds",
-          "color": [
-            0,
-            255,
-            25,
-            255
-          ],
-          "id": "1892b63f-b92e-4192-a152-54bf907814a2"
-        },
-        {
-          "name": "asdfss",
-          "color": [
-            0,
-            116,
-            255,
-            255
-          ],
-          "id": "3ff1c929-a643-4ee9-a63b-0d2fe4cc2883"
-        }
+        "3725f82e-d60a-4574-9556-1b7d856b8012",
+        "2dea88a2-961c-4be1-b627-82b795f68ba3"
       ]
     },
     {
-      "id": "5fefaca0-5da8-4e16-a138-1dcf2187c759",
+      "id": "dc5cdddc-66d4-4607-9986-bd683be032c1",
       "title": "New",
       "metadata": null,
-      "x": 41.617188,
-      "y": 117.15625,
+      "x": 836.77344,
+      "y": 879.5742,
       "collapsed": true,
       "path": null,
       "annotations": [],
-      "color": null,
-      "tags": []
-    },
-    {
-      "id": "ec15f095-3f55-47f8-b863-d56e6f1bfaae",
-      "title": "New",
-      "metadata": null,
-      "x": 520.6758,
-      "y": 221.13672,
-      "collapsed": true,
-      "path": null,
-      "annotations": [],
-      "color": null,
-      "tags": []
-    },
-    {
-      "id": "8d389c9b-913a-4aad-9211-c7a92e4e6d79",
-      "title": "/home/flor/Documents/Dev/RefMap/test/pdfs/can20.pdf",
-      "metadata": {
-        "title": "",
-        "keywords": [],
-        "authors": [],
-        "date": "Mon Jul  1 09:43:16 1996 CEST",
-        "path": "/home/flor/Documents/Dev/RefMap/test/pdfs/can20.pdf"
-      },
-      "x": 538.58594,
-      "y": 567.65625,
-      "collapsed": true,
-      "path": "/home/flor/Documents/Dev/RefMap/test/pdfs/can20.pdf",
-      "annotations": [],
-      "color": null,
-      "tags": []
-    },
-    {
-      "id": "2c46eddf-2dbd-4eed-b065-dc8762098681",
-      "title": "Zero-Wire: A Deterministic and Low-Latency Wireless Bus Through Symbol-Synchronous Transmission of Optical Signals",
-      "metadata": {
-        "title": "Zero-Wire: A Deterministic and Low-Latency Wireless Bus Through Symbol-Synchronous Transmission of Optical Signals",
-        "keywords": [
-          "Internet of Things",
-          "wireless sensor networks",
-          "cyber-physical systems",
-          "visible light communication",
-          "optical wireless communication",
-          "concurrent transmission",
-          "synchronous transmission",
-          "cut-through forwarding",
-          "bus networks"
-        ],
-        "authors": [
-          "Jonathan Oostvogels; Fan Yang; Sam Michiels; and Danny Hughes"
-        ],
-        "date": "Tue Oct 20 12:17:45 2020 CEST",
-        "path": "/home/flor/Documents/Dev/RefMap/test/pdfs/Zero-Wire.pdf"
-      },
-      "x": 501.80078,
-      "y": 454.57812,
-      "collapsed": true,
-      "path": "/home/flor/Documents/Dev/RefMap/test/pdfs/Zero-Wire.pdf",
-      "annotations": [
-        {
-          "id": "bb427203-dfa3-453c-98a4-faa6be05d145",
-          "annotation_type": "TextNote",
-          "title": "asda",
-          "content": "asdf",
-          "created_at": "2025-10-18 09:34:48 UTC",
-          "page_number": null
-        },
-        {
-          "id": "8f143651-c0d3-49ae-8b8f-4b4eefa76265",
-          "annotation_type": "TextNote",
-          "title": "asdf",
-          "content": "asdf",
-          "created_at": "2025-10-18 09:35:13 UTC",
-          "page_number": null
-        }
-      ],
       "color": null,
       "tags": [
-        {
-          "name": "asdfas",
-          "color": [
-            255,
-            0,
-            0,
-            255
-          ],
-          "id": "59ab495c-25f8-4dbf-9a7d-7bf48997d24f"
-        }
+        "1c4bc491-9cdc-4046-8a20-4cc9fd4ee293",
+        "2dea88a2-961c-4be1-b627-82b795f68ba3"
       ]
     }
   ],
-  "edges": [
-    {
-      "id": "ee701bdb-7c1f-43b3-8f90-8b79fc137588",
-      "from": "ec15f095-3f55-47f8-b863-d56e6f1bfaae",
-      "to": "e385fa24-a700-4023-ab84-14ba872e2f5e",
-      "edge_type": "Normal",
-      "annotations": [],
-      "color": null
-    },
-    {
-      "id": "26c673dd-15df-475b-9a4f-64a31cd29bc9",
-      "from": "8d389c9b-913a-4aad-9211-c7a92e4e6d79",
-      "to": "e385fa24-a700-4023-ab84-14ba872e2f5e",
-      "edge_type": "References",
-      "annotations": [],
-      "color": null
-    }
-  ]
+  "edges": []
 }

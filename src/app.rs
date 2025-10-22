@@ -79,6 +79,9 @@ pub struct MindMapApp {
     edit_tag_id: Option<Uuid>,          // tag currently being edited
     edit_tag: EditableTag,              // editable tag fields
     tags_node_id: Option<Uuid>,          // node whose tags are being viewed/edited
+
+    tags: Vec<Tag>,                     // list of tags in the mind map
+
 }
 
 // Helper struct for editing metadata
@@ -92,6 +95,7 @@ struct EditableMetadata {
 
 #[derive(Debug, Clone, Default)]
 struct EditableTag {
+    id: Uuid,
     name: String,
     color: egui::Color32,
 }
@@ -793,13 +797,15 @@ impl MindMapApp {
             // Draw tags
             let mut tag_offset = 0.0;
             for tag in &node.tags {
-                let tag_size = egui::vec2(10.0, 10.0) * self.zoom;
-                let tag_pos = node_rect.right_bottom() - egui::vec2(5.0 + tag_offset, 5.0) * self.zoom;
-                let tag_rect = egui::Rect::from_min_size(tag_pos, tag_size);
+                if let Some(tag) = self.tags.iter().find(|t| t.id == *tag) {
+                    let tag_size = egui::vec2(10.0, 10.0) * self.zoom;
+                    let tag_pos = node_rect.right_bottom() - egui::vec2(5.0 + tag_offset, 5.0) * self.zoom;
+                    let tag_rect = egui::Rect::from_min_size(tag_pos, tag_size);
 
-                painter.rect_filled(tag_rect, 5.0, egui::Color32::from_rgba_unmultiplied(tag.color[0], tag.color[1], tag.color[2], tag.color[3]));
+                    painter.rect_filled(tag_rect, 5.0, egui::Color32::from_rgba_unmultiplied(tag.color[0], tag.color[1], tag.color[2], tag.color[3]));
 
-                tag_offset += 15.0 * self.zoom;
+                    tag_offset += 15.0 * self.zoom;
+                }
             }
         }
     }
@@ -1145,7 +1151,7 @@ impl MindMapApp {
                             ui.heading(format!("Tags for: {}", node_title));
                             ui.separator();
 
-                            // Add new annotation button
+                            // Add new tag button
                             if ui.button("➕ Add New Tag").clicked() {
                                 self.edit_tag = EditableTag::default();
                                 self.show_add_tag_dialog = true;
@@ -1230,7 +1236,7 @@ impl MindMapApp {
                     if ui.small_button("🗑").on_hover_text("Delete").clicked() {
                         // Remove annotation
                         if let Some(node) = self.map.nodes.iter_mut().find(|n| n.id == id) {
-                            node.tags.retain(|a| a.id != tag.id);
+                            node.tags.retain(|a| id != tag.id);
                             self.dirty = true;
                         }
                     }
@@ -1327,6 +1333,20 @@ impl MindMapApp {
                 .resizable(true)
                 .default_width(400.0)
                 .show(ctx, |ui| {
+                    ui.label("Select a tag for this node:");
+                    egui::ComboBox::from_label("")
+                        .selected_text(self.edit_annotation.annotation_type.name())
+                        .show_ui(ui, |ui| {
+                            for tag in &mut self.tags {
+                                ui.selectable_value(&mut self.edit_tag.id, tag.id.clone(), tag.name.as_str());
+                            }
+                        });
+
+                    if ui.button("Add Tag").clicked() {
+                        self.add_tag();
+                    }
+
+                    ui.separator();
                     ui.label("Create a new tag for this node:");
                     ui.separator();
 
@@ -1348,7 +1368,7 @@ impl MindMapApp {
                     ui.horizontal(|ui| {
                         let save_text = if is_editing { "Update" } else { "Add" };
                         if ui.button(save_text).clicked() {
-                            self.save_tag();
+                            self.create_tag(is_editing);
                             if is_editing {
                                 self.show_edit_tag_dialog = false;
                             } else {
@@ -1382,6 +1402,7 @@ impl MindMapApp {
     fn start_editing_tag(&mut self, tag: Tag) {
         self.edit_tag_id = Some(tag.id);
         self.edit_tag = EditableTag {
+            id: tag.id,
             name: tag.name,
             color: egui::Color32::from_rgba_unmultiplied(tag.color[0], tag.color[1], tag.color[2], tag.color[3]),
         };
@@ -1461,27 +1482,38 @@ impl MindMapApp {
         }
     }
 
-    fn save_tag(&mut self) {
+    fn add_tag(&mut self) {
         if let Some(node_id) = self.tags_node_id {
             if let Some(node) = self.map.nodes.iter_mut().find(|n| n.id == node_id) {
-               if let Some(edit_id) = self.edit_tag_id {
-                    // Editing existing tags
-                    if let Some(tag) = node.tags.iter_mut().find(|a| a.id == edit_id) {
-                        tag.name = self.edit_tag.name.clone();
-                        tag.color = self.edit_tag.color.to_array();
-                    }
-                    self.edit_tag_id = None;
-                } else {
-                    // Adding new annotation
-                    let tag = Tag {
-                        id: Uuid::new_v4(),
-                        name: self.edit_tag.name.clone(),
-                        color: self.edit_tag.color.to_array(),
-                    };
-                    node.tags.push(tag);
+                if !node.tags.contains(&self.edit_tag.id) {
+                    node.tags.push(self.edit_tag.id);
+                    self.dirty = true;
                 }
-
-                self.dirty = true;
+            }
+        }
+    }
+    fn create_tag(&mut self, is_editing: bool) {
+        if is_editing {
+            if let Some(tag_id) = self.edit_tag_id {
+                if let Some(tag) = self.tags.iter_mut().find(|t| t.id == tag_id) {
+                    tag.name = self.edit_tag.name.clone();
+                    let color = self.edit_tag.color;
+                    tag.color = [color.r(), color.g(), color.b(), color.a()];
+                }
+            }
+        } else {
+            let color = self.edit_tag.color;
+            let new_tag = Tag {
+                id: Uuid::new_v4(),
+                name: self.edit_tag.name.clone(),
+                color: [color.r(), color.g(), color.b(), color.a()],
+            };
+            self.tags.push(new_tag.clone());
+            if let Some(node_id) = self.tags_node_id {
+                if let Some(node) = self.map.nodes.iter_mut().find(|n| n.id == node_id) {
+                    node.tags.push(new_tag.id);
+                    self.dirty = true;
+                }
             }
         }
     }
@@ -1833,11 +1865,13 @@ impl MindMapApp {
         });
     }
 
-    fn show_existing_tags(&mut self, tags: Vec<Tag>, ui: &mut egui::Ui, node_id: Uuid) {
+    fn show_existing_tags(&mut self, tags: Vec<Uuid>, ui: &mut egui::Ui, node_id: Uuid) {
         egui::ScrollArea::vertical().show(ui, |ui| {
-            for tag in &tags {
-                self.show_tag(ui, tag, node_id);
-                ui.separator();
+            for tag_id in &tags {
+                if let Some(tag) = self.tags.clone().iter().find(|t| &t.id == tag_id) {
+                    self.show_tag(ui, tag, node_id);
+                    ui.separator();
+                }
             }
 
             if tags.is_empty() {
@@ -1897,6 +1931,7 @@ impl Default for MindMapApp {
             edit_tag_id: None,
             edit_tag: EditableTag::default(),
             tags_node_id: None,
+            tags: Vec::new()
         };
         // Load last file if it exists
         if let Ok(last_file) = load_last_file() {
