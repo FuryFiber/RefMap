@@ -20,7 +20,7 @@
 ## Introduction
 RefMap is a mind mapping application designed for organizing research papers. It has support for extracting metadata and annotation capabilities. 
 It allows users to create a visual overview of the documentation that was gathered for a research project, link related concepts, and add detailed notes to each node.
-
+![example.png](pictures/example.png)
 ---
 
 ## Getting Started
